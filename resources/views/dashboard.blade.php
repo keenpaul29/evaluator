@@ -3,96 +3,101 @@
 @section('title', 'Dashboard')
 
 @section('content')
-<div class="space-y-8">
+<div class="space-y-6">
     <div>
-        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p class="text-sm text-gray-500 mt-1">Candidate evaluation pipeline overview</p>
+        <h1 class="text-lg font-semibold text-gray-900">Dashboard</h1>
+        <p class="text-xs text-gray-400 mt-0.5">Pipeline overview</p>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="text-sm text-gray-500">Total</div>
-            <div class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['total'] }}</div>
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+            <div class="text-xs text-gray-400">Total</div>
+            <div class="text-xl font-semibold text-gray-900 mt-0.5">{{ $stats['total'] }}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="text-sm text-gray-500">Submitted</div>
-            <div class="text-2xl font-bold text-amber-600 mt-1">{{ $stats['submitted'] }}</div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+            <div class="text-xs text-gray-400">Submitted</div>
+            <div class="text-xl font-semibold text-amber-600 mt-0.5">{{ $stats['submitted'] }}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="text-sm text-gray-500">Analyzing</div>
-            <div class="text-2xl font-bold text-blue-600 mt-1">{{ $stats['analyzing'] }}</div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+            <div class="text-xs text-gray-400">Analyzing</div>
+            <div class="text-xl font-semibold text-blue-600 mt-0.5">{{ $stats['analyzing'] }}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="text-sm text-gray-500">Evaluated</div>
-            <div class="text-2xl font-bold text-purple-600 mt-1">{{ $stats['evaluated'] }}</div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+            <div class="text-xs text-gray-400">Evaluated</div>
+            <div class="text-xl font-semibold text-purple-600 mt-0.5">{{ $stats['evaluated'] }}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="text-sm text-gray-500">Shortlisted</div>
-            <div class="text-2xl font-bold text-green-600 mt-1">{{ $stats['shortlisted'] }}</div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+            <div class="text-xs text-gray-400">Shortlisted</div>
+            <div class="text-xl font-semibold text-green-600 mt-0.5">{{ $stats['shortlisted'] }}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-            <div class="text-sm text-gray-500">Avg Score</div>
-            <div class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['avg_score'] }}/10</div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3">
+            <div class="text-xs text-gray-400">Avg Score</div>
+            <div class="text-xl font-semibold text-gray-900 mt-0.5">{{ $stats['avg_score'] }}/10</div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Candidates</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 bg-white rounded-lg border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h2 class="text-sm font-medium text-gray-900">Recent Candidates</h2>
+            </div>
             @if($recentCandidates->isEmpty())
-                <p class="text-gray-400 text-sm py-8 text-center">No candidates yet. <a href="{{ route('candidates.create') }}" class="text-gray-900 underline">Add one</a>.</p>
+                <div class="p-8 text-center">
+                    <p class="text-gray-400 text-sm">No candidates yet.</p>
+                    <a href="{{ route('candidates.create') }}" class="text-xs text-gray-900 underline mt-1 inline-block">Add one</a>
+                </div>
             @else
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
-                            <tr class="border-b border-gray-100">
-                                <th class="text-left py-2 font-medium text-gray-500">Name</th>
-                                <th class="text-left py-2 font-medium text-gray-500">Status</th>
-                                <th class="text-left py-2 font-medium text-gray-500">Score</th>
-                                <th class="text-left py-2 font-medium text-gray-500">Verdict</th>
-                                <th class="text-left py-2 font-medium text-gray-500">Added</th>
+                            <tr class="border-b border-gray-50">
+                                <th class="text-left px-4 py-2 font-medium text-gray-400 text-xs">Name</th>
+                                <th class="text-left px-4 py-2 font-medium text-gray-400 text-xs">Status</th>
+                                <th class="text-left px-4 py-2 font-medium text-gray-400 text-xs">Score</th>
+                                <th class="text-left px-4 py-2 font-medium text-gray-400 text-xs">Verdict</th>
+                                <th class="text-left px-4 py-2 font-medium text-gray-400 text-xs">Added</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             @foreach($recentCandidates as $candidate)
-                                <tr class="hover:bg-gray-50">
-                                    <td class="py-2.5">
-                                        <a href="{{ route('candidates.show', $candidate) }}" class="font-medium text-gray-900 hover:underline">{{ $candidate->name }}</a>
+                                <tr class="hover:bg-gray-50/50">
+                                    <td class="px-4 py-2.5">
+                                        <a href="{{ route('candidates.show', $candidate) }}" class="font-medium text-gray-900 hover:text-gray-600">{{ $candidate->name }}</a>
                                     </td>
-                                    <td class="py-2.5">
+                                    <td class="px-4 py-2.5">
                                         @php
                                             $statusColors = [
-                                                'submitted' => 'bg-amber-100 text-amber-700',
-                                                'analyzing' => 'bg-blue-100 text-blue-700',
-                                                'evaluated' => 'bg-purple-100 text-purple-700',
-                                                'shortlisted' => 'bg-green-100 text-green-700',
-                                                'rejected' => 'bg-red-100 text-red-700',
+                                                'submitted' => 'bg-amber-50 text-amber-600',
+                                                'analyzing' => 'bg-blue-50 text-blue-600',
+                                                'evaluated' => 'bg-purple-50 text-purple-600',
+                                                'shortlisted' => 'bg-green-50 text-green-600',
+                                                'rejected' => 'bg-red-50 text-red-600',
                                             ];
                                         @endphp
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {{ $statusColors[$candidate->status] ?? 'bg-gray-100 text-gray-700' }}">
+                                        <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium {{ $statusColors[$candidate->status] ?? 'bg-gray-50 text-gray-600' }}">
                                             {{ ucfirst($candidate->status) }}
                                         </span>
                                     </td>
-                                    <td class="py-2.5 font-medium">{{ $candidate->evaluation?->overall_score ?? '—' }}</td>
-                                    <td class="py-2.5">
+                                    <td class="px-4 py-2.5 text-gray-600">{{ $candidate->evaluation?->overall_score ?? '—' }}</td>
+                                    <td class="px-4 py-2.5">
                                         @if($candidate->evaluation)
                                             @php
                                                 $verdictColors = [
-                                                    'strong_hire' => 'text-green-700',
+                                                    'strong_hire' => 'text-green-600',
                                                     'hire' => 'text-emerald-600',
                                                     'maybe' => 'text-amber-600',
                                                     'no_hire' => 'text-orange-600',
                                                     'strong_no_hire' => 'text-red-600',
                                                 ];
                                             @endphp
-                                            <span class="font-medium {{ $verdictColors[$candidate->evaluation->verdict] ?? '' }}">
+                                            <span class="text-xs font-medium {{ $verdictColors[$candidate->evaluation->verdict] ?? '' }}">
                                                 {{ $candidate->evaluation->getVerdictLabel() }}
                                             </span>
                                         @else
-                                            <span class="text-gray-400">—</span>
+                                            <span class="text-gray-300">—</span>
                                         @endif
                                     </td>
-                                    <td class="py-2.5 text-gray-500">{{ $candidate->created_at->diffForHumans() }}</td>
+                                    <td class="px-4 py-2.5 text-gray-400 text-xs">{{ $candidate->created_at->diffForHumans() }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -101,10 +106,10 @@
             @endif
         </div>
 
-        <div class="space-y-6">
-            <div class="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Pipeline Funnel</h2>
-                <div class="space-y-3">
+        <div class="space-y-4">
+            <div class="bg-white rounded-lg border border-gray-100 p-4">
+                <h2 class="text-sm font-medium text-gray-900 mb-3">Pipeline</h2>
+                <div class="space-y-2.5">
                     @php
                         $funnel = [
                             'submitted' => ['label' => 'Submitted', 'color' => 'bg-amber-500'],
@@ -119,24 +124,24 @@
                             $pipelineValues = array_values($pipeline);
                             $maxCount = !empty($pipelineValues) ? max($pipelineValues) : 1;
                             $maxCount = max($maxCount, 1);
-                            $width = max(5, ($count / $maxCount) * 100);
+                            $width = max(4, ($count / $maxCount) * 100);
                         @endphp
                         <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="text-gray-600">{{ $info['label'] }}</span>
-                                <span class="font-medium">{{ $count }}</span>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-500">{{ $info['label'] }}</span>
+                                <span class="font-medium text-gray-700">{{ $count }}</span>
                             </div>
-                            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full {{ $info['color'] }} rounded-full" style="width: {{ $width }}%"></div>
+                            <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full {{ $info['color'] }} rounded-full transition-all" style="width: {{ $width }}%"></div>
                             </div>
                         </div>
                     @endforeach
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl border border-gray-200 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Verdict Distribution</h2>
-                <div class="space-y-2">
+            <div class="bg-white rounded-lg border border-gray-100 p-4">
+                <h2 class="text-sm font-medium text-gray-900 mb-3">Verdicts</h2>
+                <div class="space-y-1.5">
                     @php
                         $verdictLabels = [
                             'strong_hire' => 'Strong Hire',
@@ -154,15 +159,15 @@
                         ];
                     @endphp
                     @forelse($stats['verdicts'] as $verdict => $count)
-                        <div class="flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-2">
-                                <div class="w-2 h-2 rounded-full {{ $verdictBg[$verdict] ?? 'bg-gray-400' }}"></div>
-                                <span class="text-gray-600">{{ $verdictLabels[$verdict] ?? $verdict }}</span>
+                        <div class="flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-1.5 h-1.5 rounded-full {{ $verdictBg[$verdict] ?? 'bg-gray-300' }}"></div>
+                                <span class="text-gray-500">{{ $verdictLabels[$verdict] ?? $verdict }}</span>
                             </div>
-                            <span class="font-medium">{{ $count }}</span>
+                            <span class="font-medium text-gray-700">{{ $count }}</span>
                         </div>
                     @empty
-                        <p class="text-gray-400 text-sm text-center py-4">No evaluations yet</p>
+                        <p class="text-gray-300 text-xs text-center py-3">No evaluations yet</p>
                     @endforelse
                 </div>
             </div>

@@ -21,7 +21,7 @@ class GithubService
     {
         $headers = [
             'Accept' => 'application/vnd.github.v3+json',
-            'User-Agent' => 'ColoredCow-Evaluator/1.0',
+            'User-Agent' => 'ColoredCow-Technical-Candidate-Evaluator/1.0',
         ];
 
         if ($this->token) {

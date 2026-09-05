@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\EvaluateCandidateJob;
 use App\Models\Candidate;
 use App\Models\HrUser;
 use App\Services\EvaluationOrchestrator;
@@ -87,6 +88,8 @@ class CandidateController extends Controller
             $githubService = app(\App\Services\GithubService::class);
             $githubService->syncCandidateRepos($validated['github_username'], $candidate->id);
         }
+
+        EvaluateCandidateJob::dispatch($candidate->id);
 
         return redirect()->route('candidates.show', $candidate)
             ->with('success', 'Candidate added. Evaluation will begin shortly.');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\EvaluateCandidateJob;
 use App\Models\Candidate;
 use App\Services\GithubService;
 use Illuminate\Http\Request;
@@ -39,6 +40,8 @@ class PublicApplyController extends Controller
 
         $githubService = app(GithubService::class);
         $githubService->syncCandidateRepos($validated['github_username'], $candidate->id);
+
+        EvaluateCandidateJob::dispatch($candidate->id);
 
         return redirect()->route('apply.success')
             ->with('candidate_id', $candidate->id);

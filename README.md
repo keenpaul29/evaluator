@@ -1,58 +1,147 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ColoredCow Technical Candidate Evaluator
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![PHP Version](https://img.shields.io/badge/PHP-8.3%2B-777BB4.svg)
+![Laravel](https://img.shields.io/badge/Laravel-13.x-FF2D20.svg)
 
-## About Laravel
+An AI-powered, multi-dimensional technical evaluation application designed to streamline the talent acquisition process for engineering roles. This application leverages artificial intelligence (Gemini/OpenAI) to statically analyze a candidate's GitHub repositories and provide a comprehensive evaluation across multiple technical dimensions.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🚀 Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Automated GitHub Analysis**: Fetches candidate repositories and performs static code analysis.
+- **AI-Powered Evaluation**: Analyzes code quality, architecture, problem-solving skills, and more using LLMs.
+- **Multi-Dimensional Scoring**: Candidates are scored on various dimensions like Code Quality, Testing, Documentation, etc.
+- **Self-Service Application**: Candidates can apply publicly via the `/apply` endpoint.
+- **HR Dashboard**: Internal view for HR and technical reviewers to manage and review candidates (`/dashboard`).
+- **Visual Data**: Radar charts to visualize candidate performance across dimensions.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 🛠 Tech Stack
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Backend**: Laravel 13, PHP 8.3
+- **Database**: SQLite
+- **Frontend**: Blade, Tailwind CSS, Alpine.js (via CDN/Vite)
+- **Charts**: Chart.js for data visualization
+- **AI Integration**: Support for Google Gemini and OpenAI.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## 📋 Prerequisites
 
-## Agentic Development
+Before you begin, ensure you have met the following requirements:
+- **PHP** >= 8.3
+- **Composer** (latest)
+- **Node.js** & **NPM**
+- **SQLite**
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+---
+
+## ⚙️ Installation & Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd operationsflow-hr
+   ```
+
+2. **Environment Configuration**
+   Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Configure API Keys**
+   Update your `.env` file with the necessary credentials:
+   ```env
+   # GitHub API Token for repository fetching (prevents rate limiting)
+   GITHUB_API_TOKEN=your_github_token
+   
+   # AI Provider Configuration
+   AI_PROVIDER=gemini # or 'openai'
+   GEMINI_API_KEY=your_gemini_key
+   OPENAI_API_KEY=your_openai_key
+   ```
+
+4. **Run Full Setup**
+   The project includes a composer script to automate the setup process (installs dependencies, generates key, creates SQLite DB, runs migrations, and builds frontend assets):
+   ```bash
+   composer setup
+   ```
+
+---
+
+## 💻 Development
+
+Start the local development server. This custom command runs `artisan serve`, the queue worker, logs watcher, and Vite server concurrently:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer dev
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Database Seeding
+To get started quickly with sample data (creates HR users and sample candidates):
+```bash
+php artisan migrate:fresh --seed
+```
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 🧪 Testing
 
-## Code of Conduct
+The test suite uses an in-memory SQLite database (`:memory:`). 
+*Note: External API calls (GitHub, Gemini) are not mocked in existing tests and will hit real endpoints.*
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+**Run the full test suite:**
+```bash
+composer test
+```
 
-## Security Vulnerabilities
+**Run a specific test file:**
+```bash
+php artisan test --filter=CandidateEvaluationTest
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+**Code Formatting:**
+Ensure code standards are met using Laravel Pint:
+```bash
+./vendor/bin/pint
+```
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 🏗 Architecture & Core Concepts
+
+### Services Pipeline
+The evaluation process is orchestrated in `app/Services/`:
+1. **`EvaluationOrchestrator`**: The main coordinator.
+2. **`GithubService`**: Fetches repositories and files via GitHub API.
+3. **`RepositoryAnalyzer`**: Performs basic static analysis locally.
+4. **`AiEvaluationService`**: Sends the aggregated data to the configured LLM for evaluation.
+5. **`ColoredCowContext`**: Injects company-specific context (tech stack, values) into AI prompts.
+
+### Controllers
+- **`CandidateController`**: Handles internal HR operations (create, update, view candidates).
+- **`PublicApplyController`**: Handles the public self-service application form.
+- **`DashboardController`**: Overview for HR users.
+
+### Data Models
+- **`Candidate`**: Core entity (Status: `submitted` → `analyzing` → `evaluated` → `shortlisted`/`rejected`).
+- **`Repository` & `RepositoryAnalysis`**: Tracks GitHub data and static analysis results.
+- **`Evaluation`**: The overall AI evaluation result.
+- **`EvaluationDimension`**: Specific scores (e.g., Code Quality: 8/10).
+- **`EvaluationComment`**: Notes from human reviewers.
+
+---
+
+## ⚠️ Known Limitations & Gotchas
+
+- **Authentication**: User authentication is not yet implemented. `Auth::id()` returns `null`. Comments and actions will currently not be tied to specific HR users.
+- **Synchronous Processing**: The AI evaluation runs **synchronously** during the HTTP request. This may cause timeouts for candidates with many repositories. (Queue jobs directory is empty).
+- **AI Failover**: No automatic fallback exists. If `services.ai.provider` fails, the evaluation will fail. 
+
+---
+
+## 📄 License
+
+This project is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).

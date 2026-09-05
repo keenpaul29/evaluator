@@ -1,8 +1,8 @@
-# OperationsFlow AI — Architectural & Decision Log
+# ColoredCow Technical Candidate Evaluator — Architectural & Decision Log
 
 ## 1. Executive Summary & Boundaries
 
-This document records architectural choices, AI extraction failure modes, confidence scoring thresholds, and Human-in-the-Loop (HITL) verification boundaries established during the development of **OperationsFlow AI**.
+This document records architectural choices, AI evaluation methodology, confidence scoring thresholds, and Human-in-the-Loop (HITL) verification boundaries established during the development of **ColoredCow Technical Candidate Evaluator**.
 
 ---
 

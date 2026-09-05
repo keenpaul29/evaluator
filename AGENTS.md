@@ -2,7 +2,7 @@
 
 ## Project
 
-Laravel 13 + PHP 8.3 full-stack app. AI-powered technical candidate evaluation platform for ColoredCow. SQLite database, Blade/Tailwind/Alpine.js frontend, Vite 8 build.
+Laravel 13 + PHP 8.3 full-stack app. ColoredCow Technical Candidate Evaluator - AI-powered multi-dimensional technical evaluation for talent acquisition. SQLite database, Blade/Tailwind/Alpine.js frontend, Vite 8 build.
 
 ## Commands
 
