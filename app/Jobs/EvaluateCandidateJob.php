@@ -35,7 +35,7 @@ class EvaluateCandidateJob implements ShouldQueue
     {
         $candidate = Candidate::find($this->candidateId);
 
-        if ($candidate) {
+        if ($candidate && $candidate->status === 'analyzing') {
             $candidate->update(['status' => 'submitted']);
         }
     }

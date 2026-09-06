@@ -124,7 +124,7 @@
                             $pipelineValues = array_values($pipeline);
                             $maxCount = !empty($pipelineValues) ? max($pipelineValues) : 1;
                             $maxCount = max($maxCount, 1);
-                            $width = max(4, ($count / $maxCount) * 100);
+                            $width = $count > 0 ? max(4, ($count / $maxCount) * 100) : 0;
                         @endphp
                         <div>
                             <div class="flex justify-between text-xs mb-1">

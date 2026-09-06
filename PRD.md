@@ -312,4 +312,4 @@ Unlike generic code review tools that produce a single quality score, this syste
 * [x] **Phase 4: Controllers & Routes** — Candidate CRUD, public apply, evaluation triggering
 * [x] **Phase 5: UI & Dashboard** — Blade views, radar charts, evaluation reports, pipeline view
 * [x] **Phase 6: Tests & Polish** — Feature tests, seed data, manual verification
-* [ ] **Phase 7: Future Enhancements (Pending)** — Implement HR Authentication, asynchronous evaluation via queues, and AI provider fallback mechanisms.
+* [ ] **Phase 7: Future Enhancements (Pending)** — Implement HR Authentication, and AI provider fallback mechanisms.

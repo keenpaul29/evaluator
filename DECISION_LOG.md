@@ -10,21 +10,21 @@ This document records architectural choices, AI evaluation methodology, confiden
 
 | Category | Trusted to AI | Human Review / Operator Override Required |
 | --- | --- | --- |
-| **Ingestion Parsing** | Extracted JSON Schema (`title`, `client_name`, `amount`, `category`, `due_date`) | Extracted items with confidence score `< 85%` or flagged ambiguities. |
-| **Category Tagging** | Autonomous classification (`Logistics`, `Billing`, `Appointment`, `Inventory`) | Overriding mistagged categories during HITL review. |
-| **Financial Actions** | Extraction of dollar amounts from raw text/receipts | Final approval before database locking or external export. |
+| **GitHub Data Fetching** | API responses (commit history, file trees, metadata) | Handling private repos or API rate limit failures. |
+| **Static Analysis** | Identifying presence of tests, CI configs, file line counts | Edge cases where custom framework structures are not detected properly. |
+| **Evaluation Scoring** | Scoring along 7 technical dimensions and writing summary | Final shortlisting or rejection decision based on the generated report. |
 
 ---
 
 ## 3. Evaluation & Edge Cases Observed
 
-### Case 1: High-Confidence Structured Invoice (Auto-Approved)
-- **Raw Input:** `"From: Marcus Vance <m.vance@vancelogistics.com> Subject: Freight invoice #8812 Total paid $3400.00 USD."`
-- **Result:** Confidence score **92%**. Automatically ingested and auto-approved to the operational database.
+### Case 1: High-Confidence Structured Repository (Auto-Evaluated)
+- **Raw Input:** GitHub repository with clean commit history, README, and structured backend.
+- **Result:** Successfully analyzed and evaluated. Overall score 8.5/10. Ready for HR review and shortlist decision.
 
-### Case 2: Ambiguous Field Missing (HITL Flagged)
-- **Raw Input:** `"Note from field agent: Customer mentioned needing appointment next week for annual audit. Contact name is Alex Taylor. No total dollar amount mentioned yet."`
-- **Result:** Confidence score **57%**. Flagged reasons: `"Financial amount or dollar value missing in text"`. Automatically routed to `ReviewQueue` for one-click human verification.
+### Case 2: Incomplete Data or Missing Context (HITL Flagged)
+- **Raw Input:** Candidate provides only one empty repository or a heavily forked repository with no original commits.
+- **Result:** Low evaluation confidence. Flagged reasons: `"Insufficient original code to evaluate"`. Sent to dashboard for manual HR override/rejection.
 
 ---
 

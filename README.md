@@ -137,7 +137,7 @@ The evaluation process is orchestrated in `app/Services/`:
 ## ⚠️ Known Limitations & Gotchas
 
 - **Authentication**: User authentication is not yet implemented. `Auth::id()` returns `null`. Comments and actions will currently not be tied to specific HR users.
-- **Synchronous Processing**: The AI evaluation runs **synchronously** during the HTTP request. This may cause timeouts for candidates with many repositories. (Queue jobs directory is empty).
+- **Asynchronous Processing**: The AI evaluation runs asynchronously via `EvaluateCandidateJob` and Laravel Queues. Ensure the queue worker is running (`php artisan queue:work`), otherwise candidate evaluation will remain stuck in the 'analyzing' state.
 - **AI Failover**: No automatic fallback exists. If `services.ai.provider` fails, the evaluation will fail. 
 
 ---
