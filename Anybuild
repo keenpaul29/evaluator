@@ -10,9 +10,6 @@ config = laravel_config(
     composer_build_script = "post-update-cmd",
     php_version = "8.4",
     php_public_dir = "public",
-    commands = {
-        "start": "sh -c 'php artisan migrate --force && php -S 0.0.0.0:$PORT -t public'",
-    },
 )
 
 build = laravel_build(config)
