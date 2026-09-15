@@ -1,0 +1,20 @@
+kind: wasmer.io/App.v0
+name: evaluator
+description: ColoredCow Technical Candidate Evaluator
+package: keenpaul29/evaluator
+
+capabilities:
+  database:
+    engine: mysql
+
+scaling:
+  mode: single_concurrency
+
+env:
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_URL: https://evaluator.wasmer.app
+  DB_CONNECTION: mysql
+  SESSION_DRIVER: database
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database

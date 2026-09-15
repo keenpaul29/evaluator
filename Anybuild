@@ -11,7 +11,7 @@ config = laravel_config(
     php_version = "8.4",
     php_public_dir = "public",
     commands = {
-        "start": "touch database/database.sqlite && php artisan migrate --force && php artisan config:cache && php -S 0.0.0.0:$PORT -t public",
+        "start": "php artisan config:cache && php artisan migrate --force && php -S 0.0.0.0:$PORT -t public",
     },
 )
 
