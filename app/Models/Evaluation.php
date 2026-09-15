@@ -15,6 +15,8 @@ class Evaluation extends Model
         'candidate_id',
         'overall_score',
         'verdict',
+        'onboarding_friction',
+        'onboarding_friction_reason',
         'narrative_summary',
         'strengths',
         'concerns',

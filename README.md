@@ -23,7 +23,7 @@ An AI-powered, multi-dimensional technical evaluation application designed to st
 - **Database**: SQLite
 - **Frontend**: Blade, Tailwind CSS, Alpine.js (via CDN/Vite)
 - **Charts**: Chart.js for data visualization
-- **AI Integration**: Support for Google Gemini and OpenAI.
+- **AI Integration**: Google Gemini and OpenAI with automatic provider fallback.
 
 ---
 
@@ -58,9 +58,11 @@ Before you begin, ensure you have met the following requirements:
    GITHUB_API_TOKEN=your_github_token
    
    # AI Provider Configuration
-   AI_PROVIDER=gemini # or 'openai'
+   AI_PROVIDER=gemini # primary provider; use 'openai' to prefer OpenAI first
    GEMINI_API_KEY=your_gemini_key
    OPENAI_API_KEY=your_openai_key
+   GEMINI_MODEL=gemini-1.5-flash
+   OPENAI_MODEL=gpt-4o-mini
    ```
 
 4. **Run Full Setup**
@@ -89,8 +91,7 @@ php artisan migrate:fresh --seed
 
 ## 🧪 Testing
 
-The test suite uses an in-memory SQLite database (`:memory:`). 
-*Note: External API calls (GitHub, Gemini) are not mocked in existing tests and will hit real endpoints.*
+The test suite uses an in-memory SQLite database (`:memory:`). GitHub and AI HTTP calls are faked in feature tests so the suite is deterministic and safe to run without real API credentials.
 
 **Run the full test suite:**
 ```bash
@@ -117,7 +118,7 @@ The evaluation process is orchestrated in `app/Services/`:
 1. **`EvaluationOrchestrator`**: The main coordinator.
 2. **`GithubService`**: Fetches repositories and files via GitHub API.
 3. **`RepositoryAnalyzer`**: Performs basic static analysis locally.
-4. **`AiEvaluationService`**: Sends the aggregated data to the configured LLM for evaluation.
+4. **`AiEvaluationService`**: Sends the aggregated data to the preferred LLM and automatically fails over to the other configured provider if the first one fails.
 5. **`ColoredCowContext`**: Injects company-specific context (tech stack, values) into AI prompts.
 
 ### Controllers
@@ -138,7 +139,7 @@ The evaluation process is orchestrated in `app/Services/`:
 
 - **Authentication**: User authentication is not yet implemented. `Auth::id()` returns `null`. Comments and actions will currently not be tied to specific HR users.
 - **Asynchronous Processing**: The AI evaluation runs asynchronously via `EvaluateCandidateJob` and Laravel Queues. Ensure the queue worker is running (`php artisan queue:work`), otherwise candidate evaluation will remain stuck in the 'analyzing' state.
-- **AI Failover**: No automatic fallback exists. If `services.ai.provider` fails, the evaluation will fail. 
+- **AI Failover**: Set `AI_PROVIDER` to the preferred provider. If that provider fails and the other provider has an API key configured, the evaluation automatically retries with the fallback model and records the model actually used.
 
 ---
 

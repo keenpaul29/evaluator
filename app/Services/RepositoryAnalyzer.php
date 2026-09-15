@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Repository;
 use App\Models\RepositoryAnalysis;
-use Illuminate\Support\Facades\Log;
 
 class RepositoryAnalyzer
 {
@@ -26,7 +25,7 @@ class RepositoryAnalyzer
 
         $files = collect($tree)->filter(fn ($item) => $item['type'] === 'blob');
         $codeFiles = $files->filter(fn ($item) => $this->isCodeFile($item['path']));
-        $totalLines = $this->estimateLines($codeFiles);
+        $totalLines = $this->estimateLines($repository, $codeFiles);
 
         $hasReadme = $files->contains(fn ($item) => str($item['path'])->lower()->startsWith('readme'));
         $hasTests = $this->detectTests($files);
@@ -37,6 +36,7 @@ class RepositoryAnalyzer
         $commitQualityScore = $this->scoreCommitQuality($commits);
         $complexity = $this->estimateComplexity($codeFiles, $languages);
         $patterns = $this->detectArchitecturalPatterns($files, $languages);
+        $authenticityData = $this->calculateAuthenticityScore($commits, $totalLines);
 
         return RepositoryAnalysis::updateOrCreate(
             ['repository_id' => $repository->id],
@@ -53,6 +53,8 @@ class RepositoryAnalyzer
                 'code_complexity_estimate' => $complexity,
                 'architectural_patterns' => $patterns,
                 'dependencies_analysis' => $this->analyzeDependencies($files),
+                'authenticity_score' => $authenticityData['score'],
+                'authenticity_flags' => $authenticityData['flags'],
                 'analyzed_at' => now(),
             ]
         );
@@ -72,16 +74,16 @@ class RepositoryAnalyzer
         return in_array(strtolower($ext), $codeExtensions);
     }
 
-    private function estimateLines($codeFiles): int
+    private function estimateLines(Repository $repository, $codeFiles): int
     {
         $totalLines = 0;
         $sampledFiles = $codeFiles->take(50);
+        [$owner, $repoName] = explode('/', $repository->full_name, 2);
 
         foreach ($sampledFiles as $file) {
-            $owner = explode('/', $file['path'])[0] ?? '';
             $content = $this->github->getFileContent(
                 $owner,
-                pathinfo($file['path'], PATHINFO_FILENAME),
+                $repoName,
                 $file['path']
             );
 
@@ -259,5 +261,45 @@ class RepositoryAnalyzer
         }
 
         return $deps;
+    }
+
+    private function calculateAuthenticityScore(array $commits, int $totalLines): array
+    {
+        $score = 100;
+        $flags = [];
+
+        if (empty($commits)) {
+            return ['score' => 50, 'flags' => ['No commit history available']];
+        }
+
+        $dates = array_map(fn ($c) => $c['commit']['author']['date'] ?? '', $commits);
+        $dates = array_filter($dates);
+        $uniqueDates = array_unique(array_map(fn ($d) => substr($d, 0, 10), $dates));
+
+        $commitCount = count($commits);
+        $daysCount = count($uniqueDates);
+
+        if ($daysCount === 1 && $totalLines > 1000) {
+            $score -= 60;
+            $flags[] = "Massive code dump: {$totalLines} lines pushed in a single day.";
+        }
+
+        if ($commitCount < 5 && $totalLines > 500) {
+            $score -= 30;
+            $flags[] = "Suspicious velocity: High volume of code ({$totalLines} lines) with very few commits ({$commitCount}).";
+        }
+
+        if ($daysCount > 5) {
+            $score = min(100, $score + 20);
+        }
+
+        if ($score === 100) {
+            $flags[] = 'Organic commit history detected.';
+        }
+
+        return [
+            'score' => max(0, $score),
+            'flags' => $flags,
+        ];
     }
 }

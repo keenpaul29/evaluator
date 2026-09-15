@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Jobs\EvaluateCandidateJob;
 use App\Models\Candidate;
 use App\Models\HrUser;
-use App\Services\EvaluationOrchestrator;
+use App\Services\GithubService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class CandidateController extends Controller
 {
@@ -80,13 +79,13 @@ class CandidateController extends Controller
             'portfolio_url' => $validated['portfolio_url'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'status' => 'submitted',
-            'submitted_by' => Auth::id(),
+            'submitted_by' => Auth::id() ?? HrUser::first()?->id,
             'submission_type' => 'hr_initiated',
         ]);
 
         if (! empty($validated['repo_urls'])) {
-            $githubService = app(\App\Services\GithubService::class);
-            $githubService->syncCandidateRepos($validated['github_username'], $candidate->id);
+            $githubService = app(GithubService::class);
+            $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
         }
 
         EvaluateCandidateJob::dispatch($candidate->id);
@@ -115,7 +114,7 @@ class CandidateController extends Controller
         }
 
         $evaluation->comments()->create([
-            'hr_user_id' => Auth::id(),
+            'hr_user_id' => Auth::id() ?? HrUser::first()?->id,
             'comment' => $validated['comment'],
         ]);
 

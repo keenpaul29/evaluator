@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\HrUser;
 use App\Models\Candidate;
 use App\Models\Evaluation;
 use App\Models\EvaluationDimension;
+use App\Models\HrUser;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 

@@ -39,7 +39,7 @@ class PublicApplyController extends Controller
         ]);
 
         $githubService = app(GithubService::class);
-        $githubService->syncCandidateRepos($validated['github_username'], $candidate->id);
+        $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
 
         EvaluateCandidateJob::dispatch($candidate->id);
 

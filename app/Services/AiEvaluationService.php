@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiEvaluationException;
 use App\Models\Candidate;
 use App\Models\Evaluation;
 use App\Models\EvaluationDimension;
@@ -11,9 +12,16 @@ use Illuminate\Support\Facades\Log;
 class AiEvaluationService
 {
     private string $provider;
+
     private string $geminiKey;
+
     private string $geminiModel;
+
     private string $openaiKey;
+
+    private string $openaiModel;
+
+    private ?string $lastProviderUsed = null;
 
     public function __construct()
     {
@@ -21,65 +29,60 @@ class AiEvaluationService
         $this->geminiKey = config('services.gemini.api_key', '');
         $this->geminiModel = config('services.gemini.model', 'gemini-1.5-flash');
         $this->openaiKey = config('services.openai.api_key', '');
+        $this->openaiModel = config('services.openai.model', 'gpt-4o-mini');
     }
 
     public function evaluate(Candidate $candidate, array $repositoryAnalyses): Evaluation
     {
         $prompt = $this->buildPrompt($candidate, $repositoryAnalyses);
 
-        $response = $this->provider === 'gemini'
-            ? $this->callGemini($prompt)
-            : $this->callOpenAI($prompt);
+        $response = $this->callProviderWithFallback($prompt);
 
         $parsed = $this->parseResponse($response);
 
         return $this->storeEvaluation($candidate, $parsed);
     }
 
+    private function callProviderWithFallback(string $prompt): string
+    {
+        $providers = $this->provider === 'openai'
+            ? ['openai', 'gemini']
+            : ['gemini', 'openai'];
+
+        $lastException = null;
+
+        foreach ($providers as $provider) {
+            try {
+                $response = $provider === 'gemini'
+                    ? $this->callGemini($prompt)
+                    : $this->callOpenAI($prompt);
+
+                $this->lastProviderUsed = $provider;
+
+                return $response;
+            } catch (AiEvaluationException $exception) {
+                $lastException = $exception;
+
+                Log::warning('AI evaluation provider failed', [
+                    'provider' => $provider,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        throw new AiEvaluationException(
+            'All configured AI providers failed: '.($lastException?->getMessage() ?? 'unknown error'),
+            previous: $lastException
+        );
+    }
+
     private function buildPrompt(Candidate $candidate, array $repositoryAnalyses): string
     {
         $context = ColoredCowContext::getFullContext();
 
-        $repoSummaries = '';
-        foreach ($repositoryAnalyses as $analysis) {
-            $repo = $analysis->repository;
-            $repoSummaries .= <<<EOT
-
-            REPOSITORY: {$repo->full_name}
-            - Description: {$repo->description}
-            - Primary Language: {$repo->primary_language}
-            - Stars: {$repo->stars_count}, Forks: {$repo->forks_count}
-            - Topics: {$repo->topics ? implode(', ', $repo->topics) : 'none'}
-            - Is Fork: {$repo->is_fork ? 'Yes' : 'No'}
-            
-            ANALYSIS:
-            - Files analyzed: {$analysis->total_files_analyzed}
-            - Lines of code: {$analysis->total_lines_analyzed}
-            - Languages: {$analysis->primary_languages ? implode(', ', array_keys($analysis->primary_languages)) : 'unknown'}
-            - Has README: {$analysis->has_readme ? 'Yes' : 'No'}
-            - Has Tests: {$analysis->has_tests ? 'Yes' : 'No'}
-            - Has CI/CD: {$analysis->has_ci_config ? 'Yes' : 'No'}
-            - Has Documentation: {$analysis->has_documentation ? 'Yes' : 'No'}
-            - Commit frequency score: {$analysis->commit_frequency_score}/10
-            - Commit quality score: {$analysis->avg_commit_quality_score}/10
-            - Code complexity: {$analysis->code_complexity_estimate}
-            - Architectural patterns: {$analysis->architectural_patterns ? implode(', ', $analysis->architectural_patterns) : 'none detected'}
-
-            EOT;
-        }
-
-        $valuesPrompt = '';
-        foreach ($context['values'] as $name => $details) {
-            $signals = implode("\n        ", array_map(fn ($s) => "- {$s}", $details['evaluation_signals']));
-            $valuesPrompt .= "        {$name}: {$details['description']}\n        Evaluation signals:\n        {$signals}\n\n";
-        }
-
-        $techStack = $context['tech_stack'];
-        $techSummary = "Backend: " . implode(', ', $techStack['backend']['primary']) .
-            "\n        Frontend: " . implode(', ', $techStack['frontend']['primary']) .
-            "\n        Database: " . implode(', ', $techStack['database']['primary']) .
-            "\n        Cloud: " . $techStack['cloud']['provider'] .
-            "\n        Practices: " . implode(', ', $techStack['practices']);
+        $repoSummaries = $this->formatRepositoryAnalyses($repositoryAnalyses);
+        $valuesPrompt = $this->formatContextValues($context['values']);
+        $techSummary = $this->formatTechStack($context['tech_stack']);
 
         return <<<EOT
         You are evaluating a technical candidate for ColoredCow.
@@ -114,10 +117,18 @@ class AiEvaluationService
         6. LEARNING_TRAJECTORY — Evidence of growth over time, responding to feedback, trying new technologies
         7. TECHNICAL_BREADTH — Range across frontend/backend/DevOps/database
 
+        CALCULATE ONBOARDING FRICTION:
+        Compare the candidate's detected languages and architectural patterns against ColoredCow's Tech Stack.
+        - "low": High overlap (e.g., strong PHP/Laravel/Vue experience).
+        - "medium": Partial overlap or easily translatable skills (e.g., strong MVC in another language like Ruby on Rails).
+        - "high": Completely disjointed stack (e.g., exclusively low-level C++ or legacy tools).
+
         OUTPUT FORMAT (JSON only, no markdown):
         {
             "overall_score": 7.5,
             "verdict": "hire",
+            "onboarding_friction": "medium",
+            "onboarding_friction_reason": "Explanation comparing their stack to ColoredCow's stack.",
             "dimensions": [
                 {
                     "dimension": "code_quality",
@@ -128,7 +139,9 @@ class AiEvaluationService
             ],
             "strengths": ["Strength 1", "Strength 2"],
             "concerns": ["Concern 1", "Concern 2"],
-            "interview_focus_areas": ["Area to explore in interview"],
+            "interview_focus_areas": [
+                "Instead of a generic topic, provide a highly specific technical interview question or a pair-programming refactoring challenge based on a complex or suboptimal architectural decision you found in their code. E.g., 'In your ecommerce-api repo, you placed payment logic in the CheckoutController. How would you refactor this to a Service class?'"
+            ],
             "narrative_summary": "A comprehensive 2-3 paragraph assessment of this candidate, covering their technical abilities, alignment with ColoredCow values, and overall recommendation."
         }
 
@@ -143,10 +156,78 @@ class AiEvaluationService
         EOT;
     }
 
+    private function formatRepositoryAnalyses(array $repositoryAnalyses): string
+    {
+        $repoSummaries = '';
+        foreach ($repositoryAnalyses as $analysis) {
+            $repoSummaries .= $this->formatSingleAnalysis($analysis);
+        }
+
+        return $repoSummaries;
+    }
+
+    private function formatSingleAnalysis(object $analysis): string
+    {
+        $repo = $analysis->repository;
+
+        $topics = $repo->topics ? implode(', ', $repo->topics) : 'none';
+        $isFork = $repo->is_fork ? 'Yes' : 'No';
+        $languages = $analysis->primary_languages ? implode(', ', array_keys($analysis->primary_languages)) : 'unknown';
+        $hasReadme = $analysis->has_readme ? 'Yes' : 'No';
+        $hasTests = $analysis->has_tests ? 'Yes' : 'No';
+        $hasCiConfig = $analysis->has_ci_config ? 'Yes' : 'No';
+        $hasDocumentation = $analysis->has_documentation ? 'Yes' : 'No';
+        $architecturalPatterns = $analysis->architectural_patterns ? implode(', ', $analysis->architectural_patterns) : 'none detected';
+
+        return <<<EOT
+
+            REPOSITORY: {$repo->full_name}
+            - Description: {$repo->description}
+            - Primary Language: {$repo->primary_language}
+            - Stars: {$repo->stars_count}, Forks: {$repo->forks_count}
+            - Topics: {$topics}
+            - Is Fork: {$isFork}
+            
+            ANALYSIS:
+            - Files analyzed: {$analysis->total_files_analyzed}
+            - Lines of code: {$analysis->total_lines_analyzed}
+            - Languages: {$languages}
+            - Has README: {$hasReadme}
+            - Has Tests: {$hasTests}
+            - Has CI/CD: {$hasCiConfig}
+            - Has Documentation: {$hasDocumentation}
+            - Commit frequency score: {$analysis->commit_frequency_score}/10
+            - Commit quality score: {$analysis->avg_commit_quality_score}/10
+            - Code complexity: {$analysis->code_complexity_estimate}
+            - Architectural patterns: {$architecturalPatterns}
+
+            EOT;
+    }
+
+    private function formatContextValues(array $values): string
+    {
+        $valuesPrompt = '';
+        foreach ($values as $name => $details) {
+            $signals = implode("\n        ", array_map(fn ($s) => "- {$s}", $details['evaluation_signals']));
+            $valuesPrompt .= "        {$name}: {$details['description']}\n        Evaluation signals:\n        {$signals}\n\n";
+        }
+
+        return $valuesPrompt;
+    }
+
+    private function formatTechStack(array $techStack): string
+    {
+        return 'Backend: '.implode(', ', $techStack['backend']['primary']).
+            "\n        Frontend: ".implode(', ', $techStack['frontend']['primary']).
+            "\n        Database: ".implode(', ', $techStack['database']['primary']).
+            "\n        Cloud: ".$techStack['cloud']['provider'].
+            "\n        Practices: ".implode(', ', $techStack['practices']);
+    }
+
     private function callGemini(string $prompt): string
     {
         if (! $this->geminiKey) {
-            throw new \RuntimeException('Gemini API key not configured');
+            throw new AiEvaluationException('Gemini API key not configured');
         }
 
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->geminiModel}:generateContent?key={$this->geminiKey}";
@@ -172,7 +253,7 @@ class AiEvaluationService
                 'body' => $response->body(),
             ]);
 
-            throw new \RuntimeException('Gemini API call failed: ' . $response->body());
+            throw new AiEvaluationException('Gemini API call failed: '.$response->body());
         }
 
         $data = $response->json();
@@ -183,14 +264,14 @@ class AiEvaluationService
     private function callOpenAI(string $prompt): string
     {
         if (! $this->openaiKey) {
-            throw new \RuntimeException('OpenAI API key not configured');
+            throw new AiEvaluationException('OpenAI API key not configured');
         }
 
         $response = Http::timeout(120)->withHeaders([
-            'Authorization' => 'Bearer ' . $this->openaiKey,
+            'Authorization' => 'Bearer '.$this->openaiKey,
             'Content-Type' => 'application/json',
         ])->post('https://api.openai.com/v1/chat/completions', [
-            'model' => 'gpt-4o-mini',
+            'model' => $this->openaiModel,
             'messages' => [
                 ['role' => 'system', 'content' => 'You are a technical hiring evaluator. Output valid JSON only.'],
                 ['role' => 'user', 'content' => $prompt],
@@ -206,7 +287,7 @@ class AiEvaluationService
                 'body' => $response->body(),
             ]);
 
-            throw new \RuntimeException('OpenAI API call failed: ' . $response->body());
+            throw new AiEvaluationException('OpenAI API call failed: '.$response->body());
         }
 
         $data = $response->json();
@@ -225,7 +306,7 @@ class AiEvaluationService
         }
 
         if (! $decoded || ! isset($decoded['overall_score'], $decoded['verdict'], $decoded['dimensions'])) {
-            throw new \RuntimeException('Invalid AI response format: ' . substr($response, 0, 500));
+            throw new AiEvaluationException('Invalid AI response format: '.substr($response, 0, 500));
         }
 
         return $decoded;
@@ -237,11 +318,13 @@ class AiEvaluationService
             'candidate_id' => $candidate->id,
             'overall_score' => $parsed['overall_score'],
             'verdict' => $parsed['verdict'],
+            'onboarding_friction' => $parsed['onboarding_friction'] ?? null,
+            'onboarding_friction_reason' => $parsed['onboarding_friction_reason'] ?? null,
             'narrative_summary' => $parsed['narrative_summary'] ?? '',
             'strengths' => $parsed['strengths'] ?? [],
             'concerns' => $parsed['concerns'] ?? [],
             'interview_focus_areas' => $parsed['interview_focus_areas'] ?? [],
-            'ai_model_used' => $this->provider === 'gemini' ? $this->geminiModel : 'gpt-4o-mini',
+            'ai_model_used' => $this->lastProviderUsed === 'gemini' ? $this->geminiModel : $this->openaiModel,
             'evaluated_at' => now(),
         ]);
 

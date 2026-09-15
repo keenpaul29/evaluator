@@ -14,7 +14,7 @@ class GithubService
 
     public function __construct()
     {
-        $this->token = config('services.github.token', '');
+        $this->token = config('services.github.token') ?? '';
     }
 
     private function headers(): array
@@ -25,7 +25,7 @@ class GithubService
         ];
 
         if ($this->token) {
-            $headers['Authorization'] = 'Bearer ' . $this->token;
+            $headers['Authorization'] = 'Bearer '.$this->token;
         }
 
         return $headers;
@@ -157,38 +157,94 @@ class GithubService
         return $response->json();
     }
 
+    public function syncCandidateRepoUrls(array $repoUrls, int $candidateId): array
+    {
+        $synced = [];
+
+        foreach ($repoUrls as $repoUrl) {
+            $parts = $this->parseGithubRepoUrl($repoUrl);
+
+            if (! $parts) {
+                Log::warning('GitHub API: Invalid repository URL submitted', [
+                    'url' => $repoUrl,
+                    'candidate_id' => $candidateId,
+                ]);
+
+                continue;
+            }
+
+            $repoData = $this->getRepo($parts['owner'], $parts['repo']);
+
+            if (! $repoData) {
+                Log::warning('GitHub API: Submitted repository unavailable', [
+                    'url' => $repoUrl,
+                    'candidate_id' => $candidateId,
+                ]);
+
+                continue;
+            }
+
+            $synced[] = $this->upsertCandidateRepository($repoData, $candidateId);
+        }
+
+        return $synced;
+    }
+
     public function syncCandidateRepos(string $username, int $candidateId): array
     {
         $repos = $this->getUserRepos($username, 100);
         $synced = [];
 
         foreach ($repos as $repoData) {
-            $repo = Repository::updateOrCreate(
-                [
-                    'candidate_id' => $candidateId,
-                    'github_repo_id' => $repoData['id'],
-                ],
-                [
-                    'name' => $repoData['name'],
-                    'full_name' => $repoData['full_name'],
-                    'description' => $repoData['description'] ?? null,
-                    'html_url' => $repoData['html_url'],
-                    'default_branch' => $repoData['default_branch'] ?? 'main',
-                    'primary_language' => $repoData['language'] ?? null,
-                    'stars_count' => $repoData['stargazers_count'] ?? 0,
-                    'forks_count' => $repoData['forks_count'] ?? 0,
-                    'open_issues_count' => $repoData['open_issues_count'] ?? 0,
-                    'created_at_github' => $repoData['created_at'] ?? null,
-                    'updated_at_github' => $repoData['updated_at'] ?? null,
-                    'topics' => $repoData['topics'] ?? [],
-                    'is_fork' => $repoData['fork'] ?? false,
-                    'fork_parent_name' => $repoData['fork'] ? ($repoData['parent']['full_name'] ?? null) : null,
-                ]
-            );
-
-            $synced[] = $repo;
+            $synced[] = $this->upsertCandidateRepository($repoData, $candidateId);
         }
 
         return $synced;
+    }
+
+    private function parseGithubRepoUrl(string $repoUrl): ?array
+    {
+        $path = parse_url(trim($repoUrl), PHP_URL_PATH);
+
+        if (! $path) {
+            return null;
+        }
+
+        $segments = array_values(array_filter(explode('/', trim($path, '/'))));
+
+        if (count($segments) < 2) {
+            return null;
+        }
+
+        return [
+            'owner' => $segments[0],
+            'repo' => preg_replace('/\.git$/', '', $segments[1]),
+        ];
+    }
+
+    private function upsertCandidateRepository(array $repoData, int $candidateId): Repository
+    {
+        return Repository::updateOrCreate(
+            [
+                'candidate_id' => $candidateId,
+                'github_repo_id' => $repoData['id'],
+            ],
+            [
+                'name' => $repoData['name'],
+                'full_name' => $repoData['full_name'],
+                'description' => $repoData['description'] ?? null,
+                'html_url' => $repoData['html_url'],
+                'default_branch' => $repoData['default_branch'] ?? 'main',
+                'primary_language' => $repoData['language'] ?? null,
+                'stars_count' => $repoData['stargazers_count'] ?? 0,
+                'forks_count' => $repoData['forks_count'] ?? 0,
+                'open_issues_count' => $repoData['open_issues_count'] ?? 0,
+                'created_at_github' => $repoData['created_at'] ?? null,
+                'updated_at_github' => $repoData['updated_at'] ?? null,
+                'topics' => $repoData['topics'] ?? [],
+                'is_fork' => $repoData['fork'] ?? false,
+                'fork_parent_name' => ($repoData['fork'] ?? false) ? ($repoData['parent']['full_name'] ?? null) : null,
+            ]
+        );
     }
 }

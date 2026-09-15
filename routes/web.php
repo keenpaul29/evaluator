@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\EvaluationStatusController;
 use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicApplyController;
-use App\Http\Controllers\Api\EvaluationStatusController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

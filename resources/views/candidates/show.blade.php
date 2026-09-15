@@ -86,6 +86,41 @@
 
     @if($candidate->evaluation)
         @php $evaluation = $candidate->evaluation; @endphp
+        @if($evaluation->onboarding_friction)
+            <div class="bg-white rounded-lg border border-gray-100 p-5 mb-4 shadow-sm border-l-4 border-l-indigo-500">
+                <h2 class="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wider">
+                    First-Round Eliminator Recommendation
+                </h2>
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-xs text-gray-500 font-semibold">Onboarding Friction:</span>
+                            @if($evaluation->onboarding_friction === 'low')
+                                <span class="px-2.5 py-0.5 rounded text-xs font-bold bg-green-100 text-green-800">Low (High Fit)</span>
+                            @elseif($evaluation->onboarding_friction === 'medium')
+                                <span class="px-2.5 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800">Medium</span>
+                            @else
+                                <span class="px-2.5 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800">High (Low Fit)</span>
+                            @endif
+                        </div>
+                        <p class="text-sm text-gray-700 leading-relaxed">{{ $evaluation->onboarding_friction_reason }}</p>
+                    </div>
+                    
+                    <div class="md:text-right border-t md:border-t-0 md:border-l border-gray-100 pt-3 md:pt-0 md:pl-5 md:min-w-[200px]">
+                        <span class="block text-xs text-gray-400 mb-1">Recommended Action</span>
+                        @if($evaluation->onboarding_friction === 'high' || $evaluation->overall_score < 5.0)
+                            <div class="text-lg font-bold text-red-600 flex items-center md:justify-end gap-1.5">
+                                <span>&times;</span> Auto-Reject
+                            </div>
+                        @else
+                            <div class="text-lg font-bold text-green-600 flex items-center md:justify-end gap-1.5">
+                                <span>&rarr;</span> Advance to Onsite
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div class="bg-white rounded-lg border border-gray-100 p-4">
@@ -180,12 +215,12 @@
         </div>
 
         <div class="bg-white rounded-lg border border-gray-100 p-4">
-            <div class="text-xs text-gray-400 mb-2">Interview Focus</div>
-            <div class="flex flex-wrap gap-1.5">
+            <div class="text-xs text-gray-400 mb-2">Custom Interview Questions</div>
+            <div class="space-y-2">
                 @foreach($evaluation->interview_focus_areas as $area)
-                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                    <div class="bg-gray-50 rounded p-2.5 text-sm text-gray-700 border-l-2 border-gray-900">
                         {{ $area }}
-                    </span>
+                    </div>
                 @endforeach
             </div>
         </div>
@@ -236,6 +271,25 @@
                                     <span class="text-amber-500">fork</span>
                                 @endif
                             </div>
+                            @if($repo->analysis && $repo->analysis->authenticity_score !== null)
+                                <div class="mt-2 text-xs bg-gray-50 p-2 rounded">
+                                    <span class="font-medium text-gray-700">Authenticity Score:</span>
+                                    @if($repo->analysis->authenticity_score >= 80)
+                                        <span class="text-green-600 font-medium">{{ $repo->analysis->authenticity_score }}% (Organic)</span>
+                                    @elseif($repo->analysis->authenticity_score >= 50)
+                                        <span class="text-amber-600 font-medium">{{ $repo->analysis->authenticity_score }}% (Needs Review)</span>
+                                    @else
+                                        <span class="text-red-600 font-bold">{{ $repo->analysis->authenticity_score }}% (High AI/Copy Risk)</span>
+                                    @endif
+                                    @if(!empty($repo->analysis->authenticity_flags))
+                                        <ul class="mt-1 space-y-0.5">
+                                            @foreach($repo->analysis->authenticity_flags as $flag)
+                                                <li class="text-gray-500 pl-2">· {{ $flag }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
                         @if($repo->analysis)
                             <span class="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Analyzed</span>
@@ -340,4 +394,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 @endif
+@endpush
 @endsection

@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Log;
 class EvaluationOrchestrator
 {
     private GithubService $github;
+
     private RepositoryAnalyzer $analyzer;
+
     private AiEvaluationService $ai;
 
     public function __construct(
@@ -46,7 +48,7 @@ class EvaluationOrchestrator
                     $repo->update(['analyzed_at' => now()]);
                     $analyses[] = $analysis;
                 } catch (\Exception $e) {
-                    Log::error("Failed to analyze repo {$repo->full_name}: " . $e->getMessage());
+                    Log::error("Failed to analyze repo {$repo->full_name}: ".$e->getMessage());
                 }
             }
 
@@ -61,7 +63,7 @@ class EvaluationOrchestrator
             $this->ai->evaluate($candidate, $analyses);
 
         } catch (\Exception $e) {
-            Log::error("Evaluation failed for candidate {$candidate->id}: " . $e->getMessage());
+            Log::error("Evaluation failed for candidate {$candidate->id}: ".$e->getMessage());
             $candidate->update(['status' => 'submitted']);
 
             throw $e;

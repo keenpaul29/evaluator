@@ -24,6 +24,8 @@ class RepositoryAnalysis extends Model
         'code_complexity_estimate',
         'architectural_patterns',
         'dependencies_analysis',
+        'authenticity_score',
+        'authenticity_flags',
         'analyzed_at',
     ];
 
@@ -35,6 +37,8 @@ class RepositoryAnalysis extends Model
         'has_documentation' => 'boolean',
         'architectural_patterns' => 'array',
         'dependencies_analysis' => 'array',
+        'authenticity_flags' => 'array',
+        'authenticity_score' => 'integer',
         'analyzed_at' => 'datetime',
         'commit_frequency_score' => 'float',
         'avg_commit_quality_score' => 'float',
