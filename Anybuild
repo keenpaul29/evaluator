@@ -13,4 +13,12 @@ config = laravel_config(
 )
 
 build = laravel_build(config)
-laravel_serve(config, build, name = "operationsflow-hr")
+laravel_serve(
+    config,
+    build,
+    name = "operationsflow-hr",
+    commands = {
+        "start": "php artisan serve --host=0.0.0.0 --port=$PORT",
+        "after_deploy": "php artisan migrate --force",
+    },
+)
