@@ -51,6 +51,11 @@ class Evaluation extends Model
         return $this->hasMany(EvaluationComment::class);
     }
 
+    public function interviewQuestions(): HasMany
+    {
+        return $this->hasMany(InterviewQuestion::class);
+    }
+
     public function getDimensionScore(string $dimension): ?float
     {
         $dim = $this->dimensions()->where('dimension', $dimension)->first();

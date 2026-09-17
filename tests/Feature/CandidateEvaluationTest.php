@@ -2,18 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CandidateStatus;
+use App\Exceptions\AiEvaluationException;
 use App\Jobs\EvaluateCandidateJob;
+use App\Models\BatchJob;
 use App\Models\Candidate;
+use App\Models\CandidateComparison;
 use App\Models\Evaluation;
 use App\Models\EvaluationDimension;
+use App\Models\EvaluationProgress;
 use App\Models\HrUser;
+use App\Models\InterviewQuestion;
 use App\Models\Repository;
 use App\Models\RepositoryAnalysis;
 use App\Services\AiEvaluationService;
+use App\Services\Evaluation\EvaluationStorage;
 use App\Services\GithubService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CandidateEvaluationTest extends TestCase
@@ -82,22 +90,22 @@ class CandidateEvaluationTest extends TestCase
 
     public function test_candidate_can_be_shortlisted(): void
     {
-        $candidate = Candidate::factory()->create(['status' => 'evaluated']);
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
 
         $response = $this->post("/candidates/{$candidate->id}/shortlist");
 
         $candidate->refresh();
-        $this->assertEquals('shortlisted', $candidate->status);
+        $this->assertEquals(CandidateStatus::Shortlisted, $candidate->status);
     }
 
     public function test_candidate_can_be_rejected(): void
     {
-        $candidate = Candidate::factory()->create(['status' => 'evaluated']);
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
 
         $response = $this->post("/candidates/{$candidate->id}/reject");
 
         $candidate->refresh();
-        $this->assertEquals('rejected', $candidate->status);
+        $this->assertEquals(CandidateStatus::Rejected, $candidate->status);
     }
 
     public function test_public_apply_form_renders(): void
@@ -231,12 +239,12 @@ class CandidateEvaluationTest extends TestCase
         ]);
 
         $this->assertDatabaseCount('evaluation_dimensions', 7);
-        $this->assertEquals('evaluated', $candidate->fresh()->status);
+        $this->assertEquals(CandidateStatus::Evaluated, $candidate->fresh()->status);
     }
 
     public function test_evaluation_dimensions_are_stored(): void
     {
-        $candidate = Candidate::factory()->create(['status' => 'evaluated']);
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
 
         $evaluation = Evaluation::create([
             'candidate_id' => $candidate->id,
@@ -273,7 +281,7 @@ class CandidateEvaluationTest extends TestCase
 
     public function test_api_evaluation_status_endpoint(): void
     {
-        $candidate = Candidate::factory()->create(['status' => 'analyzing']);
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Analyzing]);
 
         $response = $this->get("/api/evaluation-status/{$candidate->id}");
 
@@ -287,7 +295,7 @@ class CandidateEvaluationTest extends TestCase
 
     public function test_api_evaluation_status_with_evaluation(): void
     {
-        $candidate = Candidate::factory()->create(['status' => 'evaluated']);
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
 
         Evaluation::create([
             'candidate_id' => $candidate->id,
@@ -309,6 +317,490 @@ class CandidateEvaluationTest extends TestCase
             'overall_score' => 8.0,
             'verdict' => 'hire',
         ]);
+    }
+
+    public function test_candidate_status_enum_values(): void
+    {
+        $this->assertEquals('submitted', CandidateStatus::Submitted->value);
+        $this->assertEquals('analyzing', CandidateStatus::Analyzing->value);
+        $this->assertEquals('evaluated', CandidateStatus::Evaluated->value);
+        $this->assertEquals('shortlisted', CandidateStatus::Shortlisted->value);
+        $this->assertEquals('rejected', CandidateStatus::Rejected->value);
+    }
+
+    public function test_candidate_status_enum_labels(): void
+    {
+        $this->assertEquals('Submitted', CandidateStatus::Submitted->label());
+        $this->assertEquals('Evaluated', CandidateStatus::Evaluated->label());
+    }
+
+    public function test_ai_validation_rejects_invalid_score(): void
+    {
+        $this->expectException(AiEvaluationException::class);
+
+        $storage = new EvaluationStorage;
+        $candidate = Candidate::factory()->create();
+
+        $storage->store($candidate, [
+            'overall_score' => 15,
+            'verdict' => 'hire',
+            'dimensions' => [],
+        ], 'gemini-1.5-flash');
+    }
+
+    public function test_ai_validation_rejects_invalid_verdict(): void
+    {
+        $this->expectException(AiEvaluationException::class);
+
+        $storage = new EvaluationStorage;
+        $candidate = Candidate::factory()->create();
+
+        $storage->store($candidate, [
+            'overall_score' => 7.5,
+            'verdict' => 'invalid_verdict',
+            'dimensions' => [],
+        ], 'gemini-1.5-flash');
+    }
+
+    public function test_ai_validation_rejects_wrong_dimension_count(): void
+    {
+        $this->expectException(AiEvaluationException::class);
+
+        $storage = new EvaluationStorage;
+        $candidate = Candidate::factory()->create();
+
+        $storage->store($candidate, [
+            'overall_score' => 7.5,
+            'verdict' => 'hire',
+            'dimensions' => [
+                ['dimension' => 'code_quality', 'score' => 8.0],
+            ],
+        ], 'gemini-1.5-flash');
+    }
+
+    public function test_comparison_can_be_created(): void
+    {
+        $candidates = Candidate::factory()->count(3)->create();
+
+        $response = $this->post('/comparisons', [
+            'name' => 'Test Comparison',
+            'candidate_ids' => $candidates->pluck('id')->toArray(),
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('candidate_comparisons', [
+            'name' => 'Test Comparison',
+        ]);
+
+        $comparison = CandidateComparison::first();
+        $this->assertEquals(3, $comparison->candidates->count());
+    }
+
+    public function test_comparison_page_renders(): void
+    {
+        $response = $this->get('/comparisons');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_batch_page_renders(): void
+    {
+        $response = $this->get('/batches');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_batch_create_page_renders(): void
+    {
+        $response = $this->get('/batches/create');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_evaluation_progress_is_created(): void
+    {
+        $candidate = Candidate::factory()->create();
+
+        $progress = EvaluationProgress::create([
+            'event_id' => Str::uuid(),
+            'candidate_id' => $candidate->id,
+            'status' => 'queued',
+            'current_step' => 'queued',
+            'steps_total' => 3,
+        ]);
+
+        $this->assertDatabaseHas('evaluation_progress', [
+            'candidate_id' => $candidate->id,
+            'status' => 'queued',
+        ]);
+
+        $progress->updateProgress('analyzing', 1, 'analyzing');
+        $this->assertEquals('analyzing', $progress->fresh()->status);
+        $this->assertEquals(1, $progress->fresh()->steps_completed);
+    }
+
+    public function test_interview_question_model(): void
+    {
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+        $evaluation = Evaluation::create([
+            'candidate_id' => $candidate->id,
+            'overall_score' => 7.5,
+            'verdict' => 'hire',
+            'narrative_summary' => 'Summary.',
+            'strengths' => [],
+            'concerns' => [],
+            'interview_focus_areas' => [],
+            'ai_model_used' => 'gemini-1.5-flash',
+            'evaluated_at' => now(),
+        ]);
+
+        $question = InterviewQuestion::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'code_quality',
+            'question' => 'How do you handle error handling?',
+            'repo_reference' => 'test/repo',
+            'file_reference' => 'src/App.php',
+            'why_ask' => 'Low score on code quality',
+            'generated_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('interview_questions', [
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'code_quality',
+        ]);
+
+        $this->assertEquals($evaluation->id, $question->evaluation->id);
+    }
+
+    public function test_batch_job_model(): void
+    {
+        $batch = BatchJob::create([
+            'name' => 'Test Batch',
+            'total_candidates' => 5,
+            'status' => 'processing',
+        ]);
+
+        $this->assertDatabaseHas('batch_jobs', [
+            'name' => 'Test Batch',
+            'status' => 'processing',
+        ]);
+
+        for ($i = 0; $i < 5; $i++) {
+            $batch->incrementProcessed();
+        }
+
+        $this->assertEquals('complete', $batch->fresh()->status);
+    }
+
+    public function test_batch_job_increment_counts(): void
+    {
+        $batch = BatchJob::create([
+            'name' => 'Test Batch',
+            'total_candidates' => 3,
+            'status' => 'processing',
+        ]);
+
+        $batch->incrementProcessed();
+        $this->assertEquals(1, $batch->fresh()->processed_count);
+
+        $batch->incrementFailed();
+        $this->assertEquals(1, $batch->fresh()->failed_count);
+    }
+
+    public function test_candidate_can_be_assigned_to_batch(): void
+    {
+        $batch = BatchJob::create([
+            'name' => 'Test Batch',
+            'total_candidates' => 1,
+            'status' => 'processing',
+        ]);
+
+        $candidate = Candidate::factory()->create([
+            'batch_id' => $batch->id,
+        ]);
+
+        $this->assertEquals($batch->id, $candidate->batch_id);
+    }
+
+    public function test_evaluation_progress_mark_complete(): void
+    {
+        $candidate = Candidate::factory()->create();
+        $progress = EvaluationProgress::create([
+            'event_id' => Str::uuid(),
+            'candidate_id' => $candidate->id,
+            'status' => 'analyzing',
+            'current_step' => 'ai_evaluation',
+            'steps_total' => 3,
+            'steps_completed' => 2,
+        ]);
+
+        $progress->markComplete();
+        $this->assertEquals('complete', $progress->fresh()->status);
+        $this->assertEquals('done', $progress->fresh()->current_step);
+        $this->assertEquals(100, $progress->fresh()->progress_percent);
+    }
+
+    public function test_evaluation_progress_mark_failed(): void
+    {
+        $candidate = Candidate::factory()->create();
+        $progress = EvaluationProgress::create([
+            'event_id' => Str::uuid(),
+            'candidate_id' => $candidate->id,
+            'status' => 'analyzing',
+            'current_step' => 'fetching_repos',
+            'steps_total' => 3,
+        ]);
+
+        $progress->markFailed('API error');
+        $this->assertEquals('failed', $progress->fresh()->status);
+        $this->assertStringContainsString('API error', $progress->fresh()->error_message);
+    }
+
+    public function test_interview_questions_attached_to_evaluation(): void
+    {
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+        $evaluation = Evaluation::create([
+            'candidate_id' => $candidate->id,
+            'overall_score' => 7.5,
+            'verdict' => 'hire',
+            'narrative_summary' => 'Summary.',
+            'strengths' => [],
+            'concerns' => [],
+            'interview_focus_areas' => [],
+            'ai_model_used' => 'gemini-1.5-flash',
+            'evaluated_at' => now(),
+        ]);
+
+        InterviewQuestion::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'code_quality',
+            'question' => 'Explain your approach to error handling.',
+            'repo_reference' => 'test/repo',
+            'file_reference' => 'src/App.php',
+            'why_ask' => 'Low score on code quality',
+            'generated_at' => now(),
+        ]);
+
+        InterviewQuestion::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'testing',
+            'question' => 'How do you structure your tests?',
+            'repo_reference' => 'test/repo',
+            'file_reference' => 'tests/Feature/ExampleTest.php',
+            'why_ask' => 'Missing test coverage',
+            'generated_at' => now(),
+        ]);
+
+        $this->assertEquals(2, $evaluation->interviewQuestions->count());
+    }
+
+    public function test_comparison_can_be_deleted(): void
+    {
+        $candidates = Candidate::factory()->count(2)->create();
+
+        $comparison = CandidateComparison::create(['name' => 'Test Delete']);
+        $comparison->candidates()->attach($candidates->pluck('id')->toArray());
+
+        $comparison->delete();
+
+        $this->assertDatabaseMissing('candidate_comparisons', ['name' => 'Test Delete']);
+    }
+
+    public function test_dashboard_displays_stats(): void
+    {
+        Candidate::factory()->count(2)->create(['status' => CandidateStatus::Evaluated]);
+        Candidate::factory()->create(['status' => CandidateStatus::Shortlisted]);
+
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_candidate_show_page_with_full_evaluation(): void
+    {
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+
+        $evaluation = Evaluation::create([
+            'candidate_id' => $candidate->id,
+            'overall_score' => 8.5,
+            'verdict' => 'strong_hire',
+            'narrative_summary' => 'Excellent candidate.',
+            'strengths' => ['Code quality', 'Architecture'],
+            'concerns' => ['Needs more open source'],
+            'interview_focus_areas' => ['Deep dive on system design'],
+            'ai_model_used' => 'gemini-1.5-flash',
+            'evaluated_at' => now(),
+        ]);
+
+        EvaluationDimension::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'code_quality',
+            'score' => 9.0,
+            'justification' => 'Excellent code quality.',
+            'evidence' => ['Clean architecture'],
+            'weight' => 1.0,
+        ]);
+
+        $response = $this->get("/candidates/{$candidate->id}");
+
+        $response->assertStatus(200);
+    }
+
+    public function test_candidate_index_shows_status_labels(): void
+    {
+        Candidate::factory()->create(['status' => CandidateStatus::Submitted]);
+        Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+
+        $response = $this->get('/candidates');
+
+        $response->assertStatus(200);
+        $response->assertSee(CandidateStatus::Submitted->label());
+        $response->assertSee(CandidateStatus::Evaluated->label());
+    }
+
+    public function test_api_evaluation_status_for_nonexistent_candidate(): void
+    {
+        $response = $this->get('/api/evaluation-status/999');
+
+        $response->assertStatus(404);
+    }
+
+    public function test_comparison_show_displays_candidates(): void
+    {
+        $candidates = Candidate::factory()->count(2)->create();
+
+        $comparison = CandidateComparison::create(['name' => 'Display Test']);
+        $comparison->candidates()->attach($candidates->pluck('id')->toArray());
+
+        $response = $this->get("/comparisons/{$comparison->id}");
+
+        $response->assertStatus(200);
+    }
+
+    public function test_batch_show_page_displays_candidates(): void
+    {
+        $batch = BatchJob::create([
+            'name' => 'Show Test',
+            'total_candidates' => 2,
+            'status' => 'complete',
+            'processed_count' => 2,
+        ]);
+
+        Candidate::factory()->count(2)->create(['batch_id' => $batch->id]);
+
+        $response = $this->get("/batches/{$batch->id}");
+
+        $response->assertStatus(200);
+    }
+
+    public function test_ai_validation_rejects_empty_dimensions(): void
+    {
+        $this->expectException(AiEvaluationException::class);
+
+        $storage = new EvaluationStorage;
+        $candidate = Candidate::factory()->create();
+
+        $storage->store($candidate, [
+            'overall_score' => 7.5,
+            'verdict' => 'hire',
+            'dimensions' => [],
+        ], 'gemini-1.5-flash');
+    }
+
+    public function test_ai_validation_normalizes_verdict(): void
+    {
+        $this->expectException(AiEvaluationException::class);
+
+        $storage = new EvaluationStorage;
+        $candidate = Candidate::factory()->create();
+
+        $storage->store($candidate, [
+            'overall_score' => 7.5,
+            'verdict' => 'invalid_verdict',
+            'dimensions' => [],
+        ], 'gemini-1.5-flash');
+    }
+
+    public function test_evaluation_can_be_created_with_all_fields(): void
+    {
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+
+        $evaluation = Evaluation::create([
+            'candidate_id' => $candidate->id,
+            'overall_score' => 9.0,
+            'verdict' => 'strong_hire',
+            'narrative_summary' => 'Outstanding candidate with exceptional skills.',
+            'strengths' => ['Clean code', 'System design', 'Leadership'],
+            'concerns' => ['Could improve on documentation'],
+            'interview_focus_areas' => ['System design deep dive', 'Code review simulation'],
+            'ai_model_used' => 'gemini-1.5-flash',
+            'evaluated_at' => now(),
+            'onboarding_friction' => 'low',
+            'onboarding_friction_reason' => 'Already familiar with Laravel ecosystem.',
+        ]);
+
+        $this->assertDatabaseHas('evaluations', [
+            'candidate_id' => $candidate->id,
+            'overall_score' => 9.0,
+            'verdict' => 'strong_hire',
+            'onboarding_friction' => 'low',
+        ]);
+    }
+
+    public function test_evaluation_dimensions_store_evidence_and_weight(): void
+    {
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+        $evaluation = Evaluation::create([
+            'candidate_id' => $candidate->id,
+            'overall_score' => 7.5,
+            'verdict' => 'hire',
+            'narrative_summary' => 'Summary.',
+            'strengths' => [],
+            'concerns' => [],
+            'interview_focus_areas' => [],
+            'ai_model_used' => 'gemini-1.5-flash',
+            'evaluated_at' => now(),
+        ]);
+
+        $dimension = EvaluationDimension::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'code_quality',
+            'score' => 8.5,
+            'justification' => 'Strong code quality.',
+            'evidence' => ['Clean commits', 'Good test coverage'],
+            'weight' => 1.2,
+        ]);
+
+        $this->assertEquals(['Clean commits', 'Good test coverage'], $dimension->evidence);
+        $this->assertEquals(1.2, $dimension->weight);
+    }
+
+    public function test_evaluation_progress_stores_error_message(): void
+    {
+        $candidate = Candidate::factory()->create();
+        $progress = EvaluationProgress::create([
+            'event_id' => Str::uuid(),
+            'candidate_id' => $candidate->id,
+            'status' => 'analyzing',
+            'current_step' => 'fetching_repos',
+            'steps_total' => 3,
+        ]);
+
+        $progress->markFailed('GitHub API rate limit exceeded');
+
+        $this->assertEquals('failed', $progress->fresh()->status);
+        $this->assertStringContainsString('rate limit', $progress->fresh()->error_message);
+    }
+
+    public function test_candidate_status_enum_all_values(): void
+    {
+        $allStatuses = CandidateStatus::cases();
+        $this->assertCount(5, $allStatuses);
+        $this->assertContains(CandidateStatus::Submitted, $allStatuses);
+        $this->assertContains(CandidateStatus::Analyzing, $allStatuses);
+        $this->assertContains(CandidateStatus::Evaluated, $allStatuses);
+        $this->assertContains(CandidateStatus::Shortlisted, $allStatuses);
+        $this->assertContains(CandidateStatus::Rejected, $allStatuses);
     }
 
     private function githubRepoPayload(array $overrides = []): array

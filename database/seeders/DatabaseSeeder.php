@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\CandidateStatus;
 use App\Models\Candidate;
 use App\Models\Evaluation;
 use App\Models\EvaluationDimension;
@@ -32,7 +33,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Priya Sharma',
                 'email' => 'priya@example.com',
                 'github_username' => 'torvalds',
-                'status' => 'evaluated',
+                'status' => CandidateStatus::Evaluated,
                 'submitted_by' => $hrUser->id,
                 'submission_type' => 'hr_initiated',
             ],
@@ -40,7 +41,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Rahul Verma',
                 'email' => 'rahul@example.com',
                 'github_username' => 'gaearon',
-                'status' => 'evaluated',
+                'status' => CandidateStatus::Evaluated,
                 'submitted_by' => $hrUser->id,
                 'submission_type' => 'hr_initiated',
             ],
@@ -48,7 +49,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Anita Desai',
                 'email' => 'anita@example.com',
                 'github_username' => 'sindresorhus',
-                'status' => 'submitted',
+                'status' => CandidateStatus::Submitted,
                 'submitted_by' => null,
                 'submission_type' => 'candidate_self_service',
             ],
@@ -58,7 +59,7 @@ class DatabaseSeeder extends Seeder
             Candidate::create($data);
         }
 
-        $evaluated = Candidate::where('status', 'evaluated')->first();
+        $evaluated = Candidate::where('status', CandidateStatus::Evaluated)->first();
         if ($evaluated) {
             $evaluation = Evaluation::create([
                 'candidate_id' => $evaluated->id,

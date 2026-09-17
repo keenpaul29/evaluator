@@ -14,7 +14,7 @@ class EvaluationStatusController extends Controller
 
         return response()->json([
             'id' => $candidate->id,
-            'status' => $candidate->status,
+            'status' => $candidate->status->value,
             'has_evaluation' => $candidate->evaluation !== null,
             'overall_score' => $candidate->evaluation?->overall_score,
             'verdict' => $candidate->evaluation?->verdict,

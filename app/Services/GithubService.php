@@ -12,6 +12,10 @@ class GithubService
 
     private string $token;
 
+    private ?int $rateLimitRemaining = null;
+
+    private ?int $rateLimitReset = null;
+
     public function __construct()
     {
         $this->token = config('services.github.token') ?? '';
@@ -31,10 +35,59 @@ class GithubService
         return $headers;
     }
 
+    private function trackRateLimit($response): void
+    {
+        $remaining = $response->header('X-RateLimit-Remaining');
+        $reset = $response->header('X-RateLimit-Reset');
+
+        $this->rateLimitRemaining = $remaining !== null ? (int) $remaining : null;
+        $this->rateLimitReset = $reset !== null ? (int) $reset : null;
+
+        if ($this->rateLimitRemaining !== null && $this->rateLimitRemaining < 100) {
+            Log::warning('GitHub API rate limit running low', [
+                'remaining' => $this->rateLimitRemaining,
+                'reset_at' => $this->rateLimitReset ? date('Y-m-d H:i:s', $this->rateLimitReset) : 'unknown',
+            ]);
+        }
+    }
+
+    private function handleRateLimit($response): void
+    {
+        if ($response->status() === 429) {
+            $retryAfter = $response->header('Retry-After');
+            $waitSeconds = $retryAfter ? (int) $retryAfter : 60;
+
+            Log::warning('GitHub API rate limited, waiting', ['wait_seconds' => $waitSeconds]);
+
+            sleep($waitSeconds);
+        }
+    }
+
+    public function getRateLimitInfo(): ?array
+    {
+        if ($this->rateLimitRemaining === null) {
+            return null;
+        }
+
+        return [
+            'remaining' => $this->rateLimitRemaining,
+            'reset_at' => $this->rateLimitReset ? date('Y-m-d H:i:s', $this->rateLimitReset) : null,
+        ];
+    }
+
     public function getUser(string $username): ?array
     {
         $response = Http::withHeaders($this->headers())
             ->get("{$this->baseUrl}/users/{$username}");
+
+        $this->trackRateLimit($response);
+
+        if ($response->status() === 429) {
+            $this->handleRateLimit($response);
+
+            $response = Http::withHeaders($this->headers())
+                ->get("{$this->baseUrl}/users/{$username}");
+        }
 
         if ($response->failed()) {
             Log::warning("GitHub API: Failed to fetch user {$username}", [
@@ -57,6 +110,20 @@ class GithubService
                 'direction' => 'desc',
             ]);
 
+        $this->trackRateLimit($response);
+
+        if ($response->status() === 429) {
+            $this->handleRateLimit($response);
+
+            $response = Http::withHeaders($this->headers())
+                ->get("{$this->baseUrl}/users/{$username}/repos", [
+                    'per_page' => $perPage,
+                    'page' => $page,
+                    'sort' => 'updated',
+                    'direction' => 'desc',
+                ]);
+        }
+
         if ($response->failed()) {
             Log::warning("GitHub API: Failed to fetch repos for {$username}", [
                 'status' => $response->status(),
@@ -72,6 +139,15 @@ class GithubService
     {
         $response = Http::withHeaders($this->headers())
             ->get("{$this->baseUrl}/repos/{$owner}/{$repo}");
+
+        $this->trackRateLimit($response);
+
+        if ($response->status() === 429) {
+            $this->handleRateLimit($response);
+
+            $response = Http::withHeaders($this->headers())
+                ->get("{$this->baseUrl}/repos/{$owner}/{$repo}");
+        }
 
         if ($response->failed()) {
             Log::warning("GitHub API: Failed to fetch repo {$owner}/{$repo}", [
@@ -91,6 +167,8 @@ class GithubService
             : "{$this->baseUrl}/repos/{$owner}/{$repo}/contents";
 
         $response = Http::withHeaders($this->headers())->get($url);
+
+        $this->trackRateLimit($response);
 
         if ($response->failed()) {
             return null;
@@ -124,6 +202,8 @@ class GithubService
                 'recursive' => 1,
             ]);
 
+        $this->trackRateLimit($response);
+
         if ($response->failed()) {
             return [];
         }
@@ -138,6 +218,8 @@ class GithubService
                 'per_page' => $perPage,
             ]);
 
+        $this->trackRateLimit($response);
+
         if ($response->failed()) {
             return [];
         }
@@ -149,6 +231,8 @@ class GithubService
     {
         $response = Http::withHeaders($this->headers())
             ->get("{$this->baseUrl}/repos/{$owner}/{$repo}/languages");
+
+        $this->trackRateLimit($response);
 
         if ($response->failed()) {
             return [];
@@ -184,6 +268,15 @@ class GithubService
                 continue;
             }
 
+            if ($repoData['fork'] ?? false) {
+                Log::info('GitHub API: Skipping forked repository', [
+                    'url' => $repoUrl,
+                    'candidate_id' => $candidateId,
+                ]);
+
+                continue;
+            }
+
             $synced[] = $this->upsertCandidateRepository($repoData, $candidateId);
         }
 
@@ -196,6 +289,10 @@ class GithubService
         $synced = [];
 
         foreach ($repos as $repoData) {
+            if ($repoData['fork'] ?? false) {
+                continue;
+            }
+
             $synced[] = $this->upsertCandidateRepository($repoData, $candidateId);
         }
 

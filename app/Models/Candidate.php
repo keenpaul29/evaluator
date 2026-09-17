@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\CandidateStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Candidate extends Model
 {
@@ -23,9 +25,22 @@ class Candidate extends Model
     ];
 
     protected $casts = [
-        'status' => 'string',
+        'status' => CandidateStatus::class,
         'submission_type' => 'string',
     ];
+
+    public static function boot(): void
+    {
+        parent::boot();
+
+        static::updating(function (Candidate $candidate) {
+            cache()->forget('dashboard_stats');
+        });
+
+        static::created(function (Candidate $candidate) {
+            cache()->forget('dashboard_stats');
+        });
+    }
 
     public function submitter()
     {
@@ -42,28 +57,38 @@ class Candidate extends Model
         return $this->hasOne(Evaluation::class);
     }
 
+    public function progress(): HasMany
+    {
+        return $this->hasMany(EvaluationProgress::class);
+    }
+
+    public function getLatestProgressAttribute(): ?EvaluationProgress
+    {
+        return $this->progress()->latest()->first();
+    }
+
     public function scopeSubmitted($query)
     {
-        return $query->where('status', 'submitted');
+        return $query->where('status', CandidateStatus::Submitted);
     }
 
     public function scopeAnalyzed($query)
     {
-        return $query->where('status', 'analyzing');
+        return $query->where('status', CandidateStatus::Analyzing);
     }
 
     public function scopeEvaluated($query)
     {
-        return $query->where('status', 'evaluated');
+        return $query->where('status', CandidateStatus::Evaluated);
     }
 
     public function scopeShortlisted($query)
     {
-        return $query->where('status', 'shortlisted');
+        return $query->where('status', CandidateStatus::Shortlisted);
     }
 
     public function scopeRejected($query)
     {
-        return $query->where('status', 'rejected');
+        return $query->where('status', CandidateStatus::Rejected);
     }
 }

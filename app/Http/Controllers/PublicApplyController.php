@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CandidateStatus;
 use App\Jobs\EvaluateCandidateJob;
 use App\Models\Candidate;
+use App\Models\EvaluationProgress;
 use App\Services\GithubService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PublicApplyController extends Controller
 {
@@ -34,14 +37,22 @@ class PublicApplyController extends Controller
             'linkedin_url' => $validated['linkedin_url'] ?? null,
             'portfolio_url' => $validated['portfolio_url'] ?? null,
             'notes' => $validated['notes'] ?? null,
-            'status' => 'submitted',
+            'status' => CandidateStatus::Submitted,
             'submission_type' => 'candidate_self_service',
         ]);
 
         $githubService = app(GithubService::class);
         $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
 
-        EvaluateCandidateJob::dispatch($candidate->id);
+        $progress = EvaluationProgress::create([
+            'event_id' => Str::uuid(),
+            'candidate_id' => $candidate->id,
+            'status' => 'queued',
+            'current_step' => 'queued',
+            'steps_total' => 3,
+        ]);
+
+        EvaluateCandidateJob::dispatch($candidate->id, $progress->id);
 
         return redirect()->route('apply.success')
             ->with('candidate_id', $candidate->id);
