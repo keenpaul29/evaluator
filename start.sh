@@ -1,5 +1,10 @@
 #!/bin/sh
-touch database/database.sqlite
+
+# Only create SQLite database if using SQLite connection
+if [ "$DB_CONNECTION" = "sqlite" ] || [ -z "$DB_CONNECTION" ]; then
+    touch database/database.sqlite
+fi
+
 php artisan key:generate --force 2>/dev/null
 php artisan migrate --force
 php artisan config:cache
