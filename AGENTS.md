@@ -31,18 +31,30 @@ php artisan migrate:fresh --seed
 
 ## Architecture
 
-- **Services** (`app/Services/`): Core business logic. `EvaluationOrchestrator` coordinates the pipeline: `GithubService` (API calls) → `RepositoryAnalyzer` (static analysis) → `AiEvaluationService` (LLM call + storage). `ColoredCowContext` provides company values/tech stack for AI prompts.
-- **Controllers** are thin — delegate to services. Two entry points for candidate creation: `CandidateController` (HR-initiated) and `PublicApplyController` (self-service).
-- **Models**: `Candidate` → has many `Repository` → has one `RepositoryAnalysis`. `Candidate` → has one `Evaluation` → has many `EvaluationDimension` + `EvaluationComment`.
+- **Services** (`app/Services/`): Core business logic split into focused classes:
+  - `EvaluationOrchestrator` coordinates the pipeline with progress checkpoints
+  - `Evaluation\EvaluationPromptBuilder` builds AI prompts from analysis data
+  - `Evaluation\AiProviderClient` handles Gemini/OpenAI API calls with fallback
+  - `Evaluation\EvaluationStorage` stores results with validation (score 0-10, 7 required dimensions, verdict normalization)
+  - `GithubService` manages GitHub API calls with rate limit tracking and fork filtering
+  - `InterviewQuestionService` generates AI-powered interview questions
+  - `AiEvaluationService` is a thin orchestrator that delegates to the Evaluation sub-services
+- **Controllers** are thin — delegate to services. Entry points: `CandidateController` (HR), `PublicApplyController` (self-service), `BatchController` (CSV upload), `ComparisonController` (side-by-side), `DashboardController` (cached stats).
+- **Models**: `Candidate` → has many `Repository` → has one `RepositoryAnalysis`. `Candidate` → has one `Evaluation` → has many `EvaluationDimension` + `EvaluationComment` + `InterviewQuestion`. `Candidate` → has one `EvaluationProgress`. `Candidate` → belongs to `BatchJob`. `CandidateComparison` ↔ `Candidate` (pivot).
+- **Enums**: `CandidateStatus` backed enum with `label()` and `color()` methods. Blade views must use `->value` for array keys, `->label()` for display.
 - **Status pipeline**: `submitted` → `analyzing` → `evaluated` → `shortlisted`/`rejected`
+- **SSE streaming**: `EvaluationProgressController` streams progress updates via `text/event-stream` with `Last-Event-ID` resumption support.
+- **Middleware**: `CheckHrUser` (`hr.user`) gates HR-only routes. Registered in `bootstrap/app.php`.
 
 ## Key Gotchas
 
 - **No auth implemented yet.** `Auth::id()` returns null. `submitted_by` and `hr_user_id` on comments will be null. Don't rely on auth guards.
-- **Evaluation runs synchronously** in the controller request, not via queue. The `app/Jobs/` directory is empty despite queue being configured. Requests may timeout for candidates with many repos.
-- **AI provider fallback is not wired.** `config('services.ai.provider')` selects one provider. If it fails, evaluation fails — no automatic fallback to the other.
+- **Evaluation runs via queue.** `EvaluateCandidateJob` dispatches to the `evaluations` queue (database driver). Job has `$tries=3` and `$timeout=300`. Controller dispatches the job and redirects immediately.
+- **AI provider fallback is wired.** `AiEvaluationService::callProviderWithFallback()` tries the primary provider first, then falls back to the secondary. Both providers must fail for evaluation to fail.
 - **Tests use SQLite in-memory** with `RefreshDatabase`. External API calls (GitHub, Gemini) are NOT mocked in existing tests — they hit real APIs. Keep this in mind when writing new tests.
 - **Tailwind loaded via CDN** in `app.blade.php` (`<script src="cdn.tailwindcss.com">`). The Vite-built CSS (`resources/css/app.css`) also imports Tailwind. Both paths exist.
+- **SQLite busy_timeout** set to 10000ms in `config/database.php` for concurrent writes.
+- **Dashboard stats are cached** for 60 seconds. Cache invalidates automatically when candidates are created/updated via `Candidate::boot()`.
 
 ## Database
 
@@ -61,5 +73,5 @@ SQLite file at `database/database.sqlite`. Tests use `:memory:`. Migrations are 
 Required env vars (see `.env.example`):
 - `GITHUB_API_TOKEN` — GitHub API calls (60 req/hr unauthenticated, 5000 authenticated)
 - `GEMINI_API_KEY` — Primary AI provider
-- `OPENAI_API_KEY` — Fallback AI provider (not auto-failover yet)
+- `OPENAI_API_KEY` — Fallback AI provider (auto-failover wired)
 - `AI_PROVIDER` — `gemini` or `openai`

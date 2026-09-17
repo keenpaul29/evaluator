@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\CandidateStatus;
 use App\Models\Candidate;
 use App\Models\HrUser;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -19,7 +20,7 @@ class CandidateFactory extends Factory
             'github_username' => fake()->userName(),
             'linkedin_url' => null,
             'portfolio_url' => null,
-            'status' => 'submitted',
+            'status' => CandidateStatus::Submitted,
             'submitted_by' => HrUser::factory(),
             'submission_type' => 'hr_initiated',
             'notes' => null,
@@ -29,28 +30,28 @@ class CandidateFactory extends Factory
     public function submitted(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'submitted',
+            'status' => CandidateStatus::Submitted,
         ]);
     }
 
     public function analyzing(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'analyzing',
+            'status' => CandidateStatus::Analyzing,
         ]);
     }
 
     public function evaluated(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'evaluated',
+            'status' => CandidateStatus::Evaluated,
         ]);
     }
 
     public function shortlisted(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'shortlisted',
+            'status' => CandidateStatus::Shortlisted,
         ]);
     }
 

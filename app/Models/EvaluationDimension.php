@@ -46,10 +46,19 @@ class EvaluationDimension extends Model
 
     public function getScoreColor(): string
     {
-        if ($this->score >= 8) return 'green';
-        if ($this->score >= 6) return 'emerald';
-        if ($this->score >= 4) return 'amber';
-        if ($this->score >= 2) return 'orange';
+        if ($this->score >= 8) {
+            return 'green';
+        }
+        if ($this->score >= 6) {
+            return 'emerald';
+        }
+        if ($this->score >= 4) {
+            return 'amber';
+        }
+        if ($this->score >= 2) {
+            return 'orange';
+        }
+
         return 'red';
     }
 }

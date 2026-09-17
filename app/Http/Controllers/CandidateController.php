@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CandidateStatus;
 use App\Jobs\EvaluateCandidateJob;
 use App\Models\Candidate;
+use App\Models\EvaluationProgress;
 use App\Models\HrUser;
-use App\Services\EvaluationOrchestrator;
+use App\Services\GithubService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CandidateController extends Controller
 {
@@ -79,17 +81,25 @@ class CandidateController extends Controller
             'linkedin_url' => $validated['linkedin_url'] ?? null,
             'portfolio_url' => $validated['portfolio_url'] ?? null,
             'notes' => $validated['notes'] ?? null,
-            'status' => 'submitted',
-            'submitted_by' => Auth::id(),
+            'status' => CandidateStatus::Submitted,
+            'submitted_by' => Auth::id() ?? HrUser::first()?->id,
             'submission_type' => 'hr_initiated',
         ]);
 
         if (! empty($validated['repo_urls'])) {
-            $githubService = app(\App\Services\GithubService::class);
-            $githubService->syncCandidateRepos($validated['github_username'], $candidate->id);
+            $githubService = app(GithubService::class);
+            $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
         }
 
-        EvaluateCandidateJob::dispatch($candidate->id);
+        $progress = EvaluationProgress::create([
+            'event_id' => Str::uuid(),
+            'candidate_id' => $candidate->id,
+            'status' => 'queued',
+            'current_step' => 'queued',
+            'steps_total' => 3,
+        ]);
+
+        EvaluateCandidateJob::dispatch($candidate->id, $progress->id);
 
         return redirect()->route('candidates.show', $candidate)
             ->with('success', 'Candidate added. Evaluation will begin shortly.');
@@ -115,7 +125,7 @@ class CandidateController extends Controller
         }
 
         $evaluation->comments()->create([
-            'hr_user_id' => Auth::id(),
+            'hr_user_id' => Auth::id() ?? HrUser::first()?->id,
             'comment' => $validated['comment'],
         ]);
 
@@ -124,14 +134,14 @@ class CandidateController extends Controller
 
     public function shortlist(Candidate $candidate)
     {
-        $candidate->update(['status' => 'shortlisted']);
+        $candidate->update(['status' => CandidateStatus::Shortlisted]);
 
         return back()->with('success', 'Candidate shortlisted.');
     }
 
     public function reject(Candidate $candidate)
     {
-        $candidate->update(['status' => 'rejected']);
+        $candidate->update(['status' => CandidateStatus::Rejected]);
 
         return back()->with('success', 'Candidate rejected.');
     }

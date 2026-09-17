@@ -15,6 +15,8 @@ class Evaluation extends Model
         'candidate_id',
         'overall_score',
         'verdict',
+        'onboarding_friction',
+        'onboarding_friction_reason',
         'narrative_summary',
         'strengths',
         'concerns',
@@ -47,6 +49,11 @@ class Evaluation extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(EvaluationComment::class);
+    }
+
+    public function interviewQuestions(): HasMany
+    {
+        return $this->hasMany(InterviewQuestion::class);
     }
 
     public function getDimensionScore(string $dimension): ?float
