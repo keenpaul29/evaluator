@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 
-            $table->unique(['candidate_comparison_id', 'candidate_id']);
+            $table->unique(['candidate_comparison_id', 'candidate_id'], 'cc_candidate_unique');
         });
     }
 
