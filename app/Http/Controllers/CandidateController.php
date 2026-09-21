@@ -88,7 +88,12 @@ class CandidateController extends Controller
 
         if (! empty($validated['repo_urls'])) {
             $githubService = app(GithubService::class);
-            $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
+            $synced = $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
+
+            if (empty($synced)) {
+                return redirect()->route('candidates.show', $candidate)
+                    ->with('error', 'Candidate added, but provided repositories failed to synchronize. Evaluation was not queued.');
+            }
         }
 
         $progress = EvaluationProgress::create([

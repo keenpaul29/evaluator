@@ -42,7 +42,15 @@ class PublicApplyController extends Controller
         ]);
 
         $githubService = app(GithubService::class);
-        $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
+        $synced = $githubService->syncCandidateRepoUrls($validated['repo_urls'], $candidate->id);
+
+        if (empty($synced)) {
+            $candidate->delete();
+
+            return back()
+                ->withInput()
+                ->withErrors(['repo_urls' => 'Unable to synchronize any of the provided repository URLs. Please verify the URLs are public and accessible.']);
+        }
 
         $progress = EvaluationProgress::create([
             'event_id' => Str::uuid(),

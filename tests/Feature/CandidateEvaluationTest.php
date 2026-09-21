@@ -147,6 +147,48 @@ class CandidateEvaluationTest extends TestCase
         Bus::assertDispatched(EvaluateCandidateJob::class);
     }
 
+    public function test_self_apply_fails_and_does_not_dispatch_evaluation_when_repos_fail_to_sync(): void
+    {
+        Http::fake([
+            'api.github.com/repos/selfuser/invalidrepo' => Http::response([], 404),
+        ]);
+
+        $response = $this->post('/apply', [
+            'name' => 'Failed Apply Candidate',
+            'email' => 'failed@example.com',
+            'github_username' => 'selfuser',
+            'repo_urls' => ['https://github.com/selfuser/invalidrepo'],
+        ]);
+
+        $response->assertSessionHasErrors(['repo_urls']);
+        $this->assertDatabaseMissing('candidates', [
+            'email' => 'failed@example.com',
+        ]);
+        Bus::assertNotDispatched(EvaluateCandidateJob::class);
+    }
+
+    public function test_hr_candidate_creation_does_not_dispatch_evaluation_when_provided_repo_urls_fail_to_sync(): void
+    {
+        HrUser::factory()->create();
+
+        Http::fake([
+            'api.github.com/repos/octo/invalid' => Http::response([], 404),
+        ]);
+
+        $response = $this->post('/candidates', [
+            'name' => 'Failed Sync Candidate',
+            'email' => 'failsync@example.com',
+            'github_username' => 'octo',
+            'repo_urls' => ['https://github.com/octo/invalid'],
+        ]);
+
+        $candidate = Candidate::where('email', 'failsync@example.com')->first();
+        $this->assertNotNull($candidate);
+        $response->assertRedirect(route('candidates.show', $candidate));
+        $response->assertSessionHas('error');
+        Bus::assertNotDispatched(EvaluateCandidateJob::class);
+    }
+
     public function test_hr_candidate_repo_urls_are_synced_without_fetching_entire_profile(): void
     {
         HrUser::factory()->create();
