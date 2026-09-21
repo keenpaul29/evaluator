@@ -10,7 +10,12 @@ use App\Http\Controllers\PublicApplyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'service' => 'candidate-evaluator',
+    ]);
+});
 Route::resource('candidates', CandidateController::class)->except(['edit', 'update', 'destroy']);
 Route::post('candidates/{candidate}/comment', [CandidateController::class, 'addComment'])->name('candidates.comment');
 Route::post('candidates/{candidate}/shortlist', [CandidateController::class, 'shortlist'])->name('candidates.shortlist');
