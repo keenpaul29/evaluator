@@ -37,6 +37,10 @@ return [
         'provider' => env('AI_PROVIDER', 'gemini'),
     ],
 
+    'evals' => [
+        'enabled' => env('EVALS_ENABLED', false),
+    ],
+
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),

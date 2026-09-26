@@ -145,11 +145,16 @@
                         'maybe' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
                         'no_hire' => 'bg-orange-50 text-orange-700 ring-orange-600/20',
                         'strong_no_hire' => 'bg-red-50 text-red-700 ring-red-600/20',
+                        'insufficient_data' => 'bg-gray-100 text-gray-600 ring-gray-400/20',
                     ];
+                    $provisional = $evaluation->dimensions->contains(fn ($dim) => $dim->isInsufficientEvidence());
                 @endphp
                 <span class="inline-flex px-2.5 py-1 rounded-badge text-sm font-semibold ring-1 ring-inset {{ $verdictColors[$evaluation->verdict] ?? '' }}">
                     {{ $evaluation->getVerdictLabel() }}
                 </span>
+                @if($provisional)
+                    <span class="block text-xs text-gray-400 mt-1">provisional</span>
+                @endif
                 <div class="text-xs text-gray-400 mt-3">
                     {{ $evaluation->evaluated_at->diffForHumans() }} · {{ $evaluation->ai_model_used }}
                 </div>
@@ -159,10 +164,11 @@
                 <div class="text-xs text-gray-400 font-medium mb-3">Dimensions</div>
                 <div class="grid grid-cols-2 gap-4">
                     @foreach($evaluation->dimensions as $dim)
+                        @php $flagged = $dim->isInsufficientEvidence(); @endphp
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <span class="text-sm text-gray-600">{{ $dim->getDimensionLabel() }}</span>
-                                <span class="text-sm font-semibold text-gray-900 font-mono">{{ $dim->score }}</span>
+                                <span class="text-sm {{ $flagged ? 'text-gray-400' : 'text-gray-600' }}">{{ $dim->getDimensionLabel() }}</span>
+                                <span class="text-sm font-semibold {{ $flagged ? 'text-gray-400' : 'text-gray-900' }} font-mono">{{ $dim->score }}</span>
                             </div>
                             <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
                                 @php
@@ -174,7 +180,7 @@
                                         'red' => 'bg-red-500',
                                     ];
                                 @endphp
-                                <div class="h-full {{ $barColors[$dim->getScoreColor()] ?? 'bg-gray-400' }} rounded-full transition-all duration-500"
+                                <div class="h-full {{ $flagged ? 'bg-gray-300' : ($barColors[$dim->getScoreColor()] ?? 'bg-gray-400') }} rounded-full transition-all duration-500"
                                     style="width: {{ ($dim->score / 10) * 100 }}%"></div>
                             </div>
                         </div>
@@ -241,27 +247,149 @@
                         {{ $area }}
                     </div>
                 @endforeach
+                @foreach($evaluation->interviewQuestions as $question)
+                    <div class="bg-gray-50 rounded-button p-3 text-sm text-gray-700 border-l-2 border-accent">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-accent">{{ $question->dimension }}</span>
+                            @if($question->repo_reference)
+                                <span class="text-xs text-gray-400 font-mono">{{ $question->repo_reference }}{{ $question->file_reference ? ' / '.$question->file_reference : '' }}</span>
+                            @endif
+                        </div>
+                        <p>{{ $question->question }}</p>
+                        @if($question->why_ask)
+                            <p class="mt-1 text-xs text-gray-400">{{ $question->why_ask }}</p>
+                        @endif
+                    </div>
+                @endforeach
             </div>
+        </div>
+
+        <div class="bg-white rounded-card border border-gray-100 shadow-card p-5">
+            <div class="text-xs text-gray-400 font-medium mb-4">Take-Home Assignment</div>
+            @php
+                $assignment = $candidate->evaluation?->assignment;
+            @endphp
+            @if($assignment)
+                @php
+                    $assignColors = [
+                        'generated' => 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'dispatched' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                        'submitted' => 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                        'under_review' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                        'complete' => 'bg-green-50 text-green-700 ring-green-600/20',
+                        'error' => 'bg-red-50 text-red-700 ring-red-600/20',
+                    ];
+                @endphp
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-gray-900">{{ $assignment->brief['title'] ?? 'Take-home assignment' }}</span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-badge text-xs font-medium ring-1 ring-inset {{ $assignColors[$assignment->status->value] ?? '' }}">
+                                <span class="w-1 h-1 rounded-full bg-current"></span>
+                                {{ $assignment->status->label() }}
+                            </span>
+                        </div>
+                        @if($assignment->ai_model_used)
+                            <p class="text-xs text-gray-400 mt-1">Generated with {{ $assignment->ai_model_used }}</p>
+                        @endif
+                    </div>
+                    @if($assignment->status->value === 'generated')
+                        <form method="POST" action="{{ route('candidates.assignment.dispatch', $candidate) }}">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Dispatch
+                            </button>
+                        </form>
+                    @endif
+                </div>
+
+                @if($assignment->status->value === 'dispatched' || $assignment->status->value === 'submitted' || $assignment->status->value === 'under_review' || $assignment->status->value === 'complete')
+                    <div class="mt-4 space-y-3">
+                        <div class="bg-gray-50 rounded-button p-3 text-sm">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-xs text-gray-400 font-medium">Submission link</span>
+                                @if($assignment->status->value === 'dispatched')
+                                    <span class="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-badge font-medium">Due {{ $assignment->due_at?->format('M d, Y') }}</span>
+                                @endif
+                            </div>
+                            <a href="{{ route('assignments.show', $assignment->token) }}" target="_blank" class="text-accent hover:underline break-all font-mono text-xs mt-1 inline-block">
+                                {{ route('assignments.show', $assignment->token) }}
+                            </a>
+                        </div>
+                        @if($assignment->status->value === 'submitted')
+                            <div class="bg-gray-50 rounded-button p-3 text-sm">
+                                <span class="text-xs text-gray-400 font-medium block mb-1">Submitted</span>
+                                <a href="{{ $assignment->submitted_repo_url }}" target="_blank" class="text-accent hover:underline break-all font-mono text-xs">{{ $assignment->submitted_repo_url }}</a>
+                                <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ $assignment->reflection }}</p>
+                            </div>
+                        @endif
+                        @if($assignment->brief['objective'] ?? null)
+                            <details class="group">
+                                <summary class="text-xs text-gray-400 font-medium cursor-pointer select-none hover:text-gray-600 transition-colors">Preview brief</summary>
+                                <div class="mt-2 text-sm text-gray-600 space-y-2 bg-white rounded-button border border-gray-100 p-3">
+                                    <p>{{ $assignment->brief['objective'] }}</p>
+                                    @if(is_array($assignment->brief['deliverables'] ?? null))
+                                        <ul class="list-disc pl-4 space-y-1">
+                                            @foreach($assignment->brief['deliverables'] as $deliverable)
+                                                <li>{{ $deliverable }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
+                                </div>
+                            </details>
+                        @endif
+                    </div>
+                @elseif($assignment->status->value === 'generated')
+                    <p class="mt-3 text-sm text-gray-500">{{ $assignment->brief['objective'] ?? '' }}</p>
+                @elseif($assignment->status->value === 'error')
+                    <p class="mt-3 text-sm text-red-600">Generation failed. Re-run the evaluation to retry.</p>
+                @endif
+            @else
+                <p class="text-sm text-gray-400">
+                    @if($candidate->evaluation && in_array($candidate->evaluation->verdict, ['hire', 'strong_hire'], true))
+                        Assignment is being generated.
+                    @else
+                        Take-home assignments are auto-generated for hire / strong-hire verdicts.
+                    @endif
+                </p>
+            @endif
         </div>
 
         <div class="bg-white rounded-card border border-gray-100 shadow-card p-5">
             <div class="text-xs text-gray-400 font-medium mb-4">Justifications</div>
             <div class="space-y-4">
                 @foreach($evaluation->dimensions as $dim)
+                    @php
+                        $flagged = $dim->isInsufficientEvidence();
+                    @endphp
                     <div x-data="{ open: false }" class="border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                         <button @click="open = !open" class="w-full flex items-center justify-between text-left">
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-medium text-gray-900">{{ $dim->getDimensionLabel() }}</span>
+                                <span class="text-sm font-medium {{ $flagged ? 'text-gray-400' : 'text-gray-900' }}">{{ $dim->getDimensionLabel() }}</span>
                                 <span class="text-xs text-gray-400 font-mono">{{ $dim->score }}/10</span>
+                                @if($flagged)
+                                    <span class="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-badge font-medium">insufficient evidence</span>
+                                @endif
                             </div>
                             <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </button>
                         <div x-show="open" x-collapse class="mt-2">
-                            <p class="text-sm text-gray-500">{{ $dim->justification }}</p>
+                            <p class="text-sm {{ $flagged ? 'text-gray-400' : 'text-gray-500' }}">{{ $dim->justification }}</p>
                             @if($dim->evidence && count($dim->evidence) > 0)
                                 <ul class="mt-2 space-y-1">
                                     @foreach($dim->evidence as $item)
-                                        <li class="text-xs text-gray-400 pl-3">· {{ $item }}</li>
+                                        @if(is_array($item) && (isset($item['insufficient']) && $item['insufficient'] === true))
+                                            <li class="text-xs text-amber-600 pl-3">· insufficient evidence: no collected signal for this value</li>
+                                        @elseif(is_array($item) && isset($item['file_path']))
+                                            <li class="text-xs text-gray-400 pl-3">· @if(isset($item['url']))<a href="{{ $item['url'] }}" target="_blank" class="hover:text-accent transition-colors">{{ $item['file_path'] }}</a>@else {{ $item['file_path'] }}@endif
+                                                @if(isset($item['commit_sha']))
+                                                    <span class="font-mono text-gray-400/80">@ {{ Str::substr($item['commit_sha'], 0, 7) }}</span>
+                                                @endif
+                                            </li>
+                                        @elseif(is_string($item))
+                                            <li class="text-xs text-gray-400 pl-3">· {{ $item }}</li>
+                                        @endif
                                     @endforeach
                                 </ul>
                             @endif

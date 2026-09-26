@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\EvaluationProgressController;
 use App\Http\Controllers\Api\EvaluationStatusController;
+use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\ComparisonController;
@@ -16,10 +17,15 @@ Route::get('/health', function () {
         'service' => 'candidate-evaluator',
     ]);
 });
+Route::get('/candidates/export', [CandidateController::class, 'export'])->name('candidates.export');
 Route::resource('candidates', CandidateController::class)->except(['edit', 'update', 'destroy']);
 Route::post('candidates/{candidate}/comment', [CandidateController::class, 'addComment'])->name('candidates.comment');
 Route::post('candidates/{candidate}/shortlist', [CandidateController::class, 'shortlist'])->name('candidates.shortlist');
 Route::post('candidates/{candidate}/reject', [CandidateController::class, 'reject'])->name('candidates.reject');
+Route::post('candidates/{candidate}/assignment/dispatch', [AssignmentController::class, 'dispatch'])->name('candidates.assignment.dispatch');
+
+Route::get('/assignments/{token}', [AssignmentController::class, 'show'])->name('assignments.show');
+Route::post('/assignments/{token}', [AssignmentController::class, 'submit'])->name('assignments.submit');
 
 Route::get('/apply', [PublicApplyController::class, 'show'])->name('apply.show');
 Route::post('/apply', [PublicApplyController::class, 'store'])->name('apply.store');
@@ -36,4 +42,6 @@ Route::delete('/comparisons/{comparison}', [ComparisonController::class, 'destro
 Route::get('/batches', [BatchController::class, 'index'])->name('batches.index');
 Route::get('/batches/create', [BatchController::class, 'create'])->name('batches.create');
 Route::post('/batches', [BatchController::class, 'store'])->name('batches.store');
+Route::get('/batches/{batch}/export', [BatchController::class, 'export'])->name('batches.export');
+Route::post('/batches/{batch}/add-candidates', [BatchController::class, 'addCandidates'])->name('batches.add-candidates');
 Route::get('/batches/{batch}', [BatchController::class, 'show'])->name('batches.show');

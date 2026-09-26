@@ -21,7 +21,7 @@ class EvaluateCandidateJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $timeout = 300;
+    public int $timeout = 600;
 
     public function __construct(
         public int $candidateId,
@@ -44,6 +44,16 @@ class EvaluateCandidateJob implements ShouldQueue
 
         if ($candidate->status === CandidateStatus::Evaluated && $candidate->evaluation) {
             $this->sendNotification($candidate);
+
+            if ($candidate->batch) {
+                $candidate->batch->incrementProcessed();
+            }
+
+            GenerateInterviewQuestionsJob::dispatch($candidate->id, $candidate->evaluation->id);
+
+            if (in_array($candidate->evaluation->verdict, ['hire', 'strong_hire'], true)) {
+                GenerateTakeHomeAssignmentJob::dispatch($candidate->id, $candidate->evaluation->id);
+            }
         }
     }
 
@@ -72,6 +82,10 @@ class EvaluateCandidateJob implements ShouldQueue
 
         if ($candidate && $candidate->status === CandidateStatus::Analyzing) {
             $candidate->update(['status' => CandidateStatus::Submitted]);
+        }
+
+        if ($candidate && $candidate->batch) {
+            $candidate->batch->incrementFailed();
         }
 
         if ($this->progressId) {
