@@ -42,7 +42,12 @@
                         @foreach($batches as $batch)
                             <tr class="hover:bg-gray-50/50 transition-colors">
                                 <td class="px-5 py-3.5">
-                                    <a href="{{ route('batches.show', $batch) }}" class="font-medium text-gray-900 hover:text-accent transition-colors">{{ $batch->name }}</a>
+                                    <div class="flex items-center gap-2">
+                                        <a href="{{ route('batches.show', $batch) }}" class="font-medium text-gray-900 hover:text-accent transition-colors">{{ $batch->name }}</a>
+                                        <a href="{{ route('batches.export', $batch) }}" title="Export results CSV" class="text-gray-300 hover:text-accent transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                                        </a>
+                                    </div>
                                 </td>
                                 <td class="px-5 py-3.5">
                                     @php

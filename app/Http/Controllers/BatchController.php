@@ -8,10 +8,12 @@ use App\Models\BatchJob;
 use App\Models\Candidate;
 use App\Models\EvaluationProgress;
 use App\Models\HrUser;
+use App\Services\CsvExporter;
 use App\Services\GithubService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BatchController extends Controller
 {
@@ -101,7 +103,86 @@ class BatchController extends Controller
     {
         $batch->load('candidates.evaluation');
 
-        return view('batches.show', compact('batch'));
+        $availableCandidates = Candidate::with('evaluation')
+            ->where(function ($q) use ($batch) {
+                $q->whereNull('batch_id')->orWhere('batch_id', '!=', $batch->id);
+            })
+            ->latest()
+            ->limit(100)
+            ->get();
+
+        return view('batches.show', compact('batch', 'availableCandidates'));
+    }
+
+    public function export(BatchJob $batch, CsvExporter $exporter): StreamedResponse
+    {
+        $candidates = $batch->candidates()
+            ->with(['evaluation', 'repositories'])
+            ->latest()
+            ->get();
+
+        return $exporter->exportCandidates(
+            $candidates,
+            'batch_'.Str::slug($batch->name).'_'.now()->format('Y-m-d_His').'.csv'
+        );
+    }
+
+    public function addCandidates(Request $request, BatchJob $batch)
+    {
+        $validated = $request->validate([
+            'candidate_ids' => 'required|array',
+            'candidate_ids.*' => 'integer',
+        ]);
+
+        $ids = array_unique($validated['candidate_ids']);
+
+        $candidates = Candidate::whereKey($ids)
+            ->where(function ($q) use ($batch) {
+                $q->whereNull('batch_id')->orWhere('batch_id', '!=', $batch->id);
+            })
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return back()->with('error', 'No candidates were added — the selected candidates are already in this batch.');
+        }
+
+        $batch->increment('total_candidates', $candidates->count());
+
+        if (! $batch->started_at) {
+            $batch->update(['started_at' => now(), 'status' => 'processing']);
+        }
+
+        $queued = 0;
+
+        foreach ($candidates as $candidate) {
+            $alreadyEvaluated = $candidate->evaluation !== null;
+
+            $candidate->update(['batch_id' => $batch->id]);
+
+            if ($alreadyEvaluated) {
+                $batch->incrementProcessed();
+
+                continue;
+            }
+
+            $progress = EvaluationProgress::create([
+                'event_id' => Str::uuid(),
+                'candidate_id' => $candidate->id,
+                'status' => 'queued',
+                'current_step' => 'queued',
+                'steps_total' => 3,
+            ]);
+
+            EvaluateCandidateJob::dispatch($candidate->id, $progress->id);
+            $queued++;
+        }
+
+        if ($queued > 0 && in_array($batch->status, ['complete', 'partial_failure'])) {
+            $batch->update(['status' => 'processing']);
+        }
+
+        return back()->with('success', $candidates->count().' candidate(s) added to the batch'
+            .($queued > 0 ? ", {$queued} queued for evaluation." : '.'));
     }
 
     private function parseCsv($file): array
