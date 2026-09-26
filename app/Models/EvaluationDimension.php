@@ -61,4 +61,9 @@ class EvaluationDimension extends Model
 
         return 'red';
     }
+
+    public function isInsufficientEvidence(): bool
+    {
+        return $this->evidence === [['insufficient' => true]];
+    }
 }

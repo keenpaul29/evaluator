@@ -26,6 +26,9 @@ class RepositoryAnalysis extends Model
         'dependencies_analysis',
         'authenticity_score',
         'authenticity_flags',
+        'artifact_file_paths',
+        'commit_samples',
+        'artifact_excerpts',
         'analyzed_at',
     ];
 
@@ -39,6 +42,9 @@ class RepositoryAnalysis extends Model
         'dependencies_analysis' => 'array',
         'authenticity_flags' => 'array',
         'authenticity_score' => 'integer',
+        'artifact_file_paths' => 'array',
+        'commit_samples' => 'array',
+        'artifact_excerpts' => 'array',
         'analyzed_at' => 'datetime',
         'commit_frequency_score' => 'float',
         'avg_commit_quality_score' => 'float',

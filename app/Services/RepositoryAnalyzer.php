@@ -4,14 +4,22 @@ namespace App\Services;
 
 use App\Models\Repository;
 use App\Models\RepositoryAnalysis;
+use App\Services\Evaluation\ArtifactContentFetcher;
+use App\Services\Evaluation\ArtifactSelector;
 
 class RepositoryAnalyzer
 {
     private GithubService $github;
 
-    public function __construct(GithubService $github)
+    private ArtifactSelector $artifactSelector;
+
+    private ArtifactContentFetcher $contentFetcher;
+
+    public function __construct(GithubService $github, ArtifactSelector $artifactSelector, ArtifactContentFetcher $contentFetcher)
     {
         $this->github = $github;
+        $this->artifactSelector = $artifactSelector;
+        $this->contentFetcher = $contentFetcher;
     }
 
     public function analyze(Repository $repository): RepositoryAnalysis
@@ -32,11 +40,15 @@ class RepositoryAnalyzer
         $hasCi = $this->detectCiConfig($files);
         $hasDocs = $this->detectDocumentation($files);
 
+        $artifactPaths = $this->artifactSelector->select($tree);
+        $commitSamples = $this->extractCommitSamples($commits);
+        $artifactExcerpts = $this->contentFetcher->fetch($repository, $artifactPaths);
+
         $commitFrequencyScore = $this->scoreCommitFrequency($commits);
         $commitQualityScore = $this->scoreCommitQuality($commits);
         $complexity = $this->estimateComplexity($codeFiles, $languages);
         $patterns = $this->detectArchitecturalPatterns($files, $languages);
-        $authenticityData = $this->calculateAuthenticityScore($commits, $totalLines);
+        $authenticityData = $this->calculateAuthenticityScore($commits);
 
         return RepositoryAnalysis::updateOrCreate(
             ['repository_id' => $repository->id],
@@ -55,6 +67,9 @@ class RepositoryAnalyzer
                 'dependencies_analysis' => $this->analyzeDependencies($files),
                 'authenticity_score' => $authenticityData['score'],
                 'authenticity_flags' => $authenticityData['flags'],
+                'artifact_file_paths' => $artifactPaths,
+                'commit_samples' => $commitSamples,
+                'artifact_excerpts' => $artifactExcerpts,
                 'analyzed_at' => now(),
             ]
         );
@@ -263,7 +278,7 @@ class RepositoryAnalyzer
         return $deps;
     }
 
-    private function calculateAuthenticityScore(array $commits, int $totalLines): array
+    private function calculateAuthenticityScore(array $commits): array
     {
         $score = 100;
         $flags = [];
@@ -279,14 +294,14 @@ class RepositoryAnalyzer
         $commitCount = count($commits);
         $daysCount = count($uniqueDates);
 
-        if ($daysCount === 1 && $totalLines > 1000) {
+        if ($daysCount === 1 && $commitCount <= 3) {
             $score -= 60;
-            $flags[] = "Massive code dump: {$totalLines} lines pushed in a single day.";
+            $flags[] = "Possible code dump: all {$commitCount} commits pushed in a single day.";
         }
 
-        if ($commitCount < 5 && $totalLines > 500) {
+        if ($commitCount < 5 && $daysCount <= 2) {
             $score -= 30;
-            $flags[] = "Suspicious velocity: High volume of code ({$totalLines} lines) with very few commits ({$commitCount}).";
+            $flags[] = "Sparse history: only {$commitCount} commits across {$daysCount} day(s).";
         }
 
         if ($daysCount > 5) {
@@ -301,5 +316,24 @@ class RepositoryAnalyzer
             'score' => max(0, $score),
             'flags' => $flags,
         ];
+    }
+
+    private function extractCommitSamples(array $commits, int $limit = 25): array
+    {
+        return collect($commits)
+            ->take($limit)
+            ->map(function ($commit) {
+                $author = $commit['commit']['author'] ?? [];
+                $firstLine = explode("\n", $commit['commit']['message'] ?? '')[0];
+
+                return [
+                    'sha' => $commit['sha'] ?? null,
+                    'author_name' => $author['name'] ?? null,
+                    'author_date' => $author['date'] ?? null,
+                    'subject' => $firstLine,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

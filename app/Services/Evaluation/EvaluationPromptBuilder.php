@@ -7,6 +7,8 @@ use App\Services\ColoredCowContext;
 
 class EvaluationPromptBuilder
 {
+    private const MAX_PROMPT_BYTES = 100 * 1024;
+
     public function build(Candidate $candidate, array $repositoryAnalyses): string
     {
         $context = ColoredCowContext::getFullContext();
@@ -15,7 +17,11 @@ class EvaluationPromptBuilder
         $valuesPrompt = $this->formatContextValues($context['values']);
         $techSummary = $this->formatTechStack($context['tech_stack']);
 
-        return <<<EOT
+        $artifactBlocks = $this->collectArtifactBlocks($repositoryAnalyses);
+
+        $artifactsSection = $this->capArtifacts($artifactBlocks);
+
+        $prompt = <<<EOT
         You are evaluating a technical candidate for ColoredCow.
 
         COMPANY PROFILE:
@@ -38,7 +44,10 @@ class EvaluationPromptBuilder
         REPOSITORY ANALYSES:
         {$repoSummaries}
 
-        EVALUATE THIS CANDIDATE ACROSS 7 DIMENSIONS (score each 1-10):
+        ARTIFACTS (citable evidence — cite ONLY these):
+        {$artifactsSection}
+
+        EVALUATE THIS CANDIDATE ACROSS 7 DIMENSIONS (score each 0-10):
 
         1. CODE_QUALITY — Readability, structure, naming conventions, DRY principles, error handling
         2. TECHNICAL_JUDGMENT — Architecture decisions, trade-off awareness, pragmatic choices
@@ -54,6 +63,11 @@ class EvaluationPromptBuilder
         - "medium": Partial overlap or easily translatable skills (e.g., strong MVC in another language like Ruby on Rails).
         - "high": Completely disjointed stack (e.g., exclusively low-level C++ or legacy tools).
 
+        CITATION REQUIREMENTS:
+        Every dimension's "evidence" must be an array of citation objects with the EXACT shape:
+        {"file_path": "path/from/the/repository", "commit_sha": "sha", "url": "https://github.com/OWNER/REPO"}
+        Every cited file_path MUST exist in the ARTIFACTS sections below. Do NOT invent file paths, commit SHAs, or URLs that are not in the artifacts. If a dimension has no supporting artifact in the artifacts provided, set evidence to exactly: {"insufficient": true} with no file_path/commit_sha/url keys.
+
         OUTPUT FORMAT (JSON only, no markdown):
         {
             "overall_score": 7.5,
@@ -65,7 +79,7 @@ class EvaluationPromptBuilder
                     "dimension": "code_quality",
                     "score": 8.0,
                     "justification": "Detailed explanation of code quality assessment",
-                    "evidence": ["Specific example from their code"]
+                    "evidence": [{"file_path": "app/Services/GameService.php", "commit_sha": "abc123", "url": "https://github.com/janedoe/rpg-app/blob/abc123/app/Services/GameService.php"}]
                 }
             ],
             "strengths": ["Strength 1", "Strength 2"],
@@ -83,8 +97,10 @@ class EvaluationPromptBuilder
         - no_hire: Score >= 3.0, significant gaps
         - strong_no_hire: Score < 3.0, fundamental misalignment
 
-        Be specific. Use evidence from the actual repositories. Be honest about gaps. Think about whether this person would thrive at a 25-person company that values ownership, craft, and long-term thinking.
+        Be specific. Use evidence ONLY from the actual artifacts (file excerpts, commit subjects) provided above. Be honest about gaps. Think about whether this person would thrive at a 25-person company that values ownership, craft, and long-term thinking.
         EOT;
+
+        return $prompt;
     }
 
     private function formatRepositoryAnalyses(array $repositoryAnalyses): string
@@ -110,7 +126,7 @@ class EvaluationPromptBuilder
         $hasDocumentation = $analysis->has_documentation ? 'Yes' : 'No';
         $architecturalPatterns = $analysis->architectural_patterns ? implode(', ', $analysis->architectural_patterns) : 'none detected';
 
-        return <<<EOT
+        $block = <<<EOT
 
             REPOSITORY: {$repo->full_name}
             - Description: {$repo->description}
@@ -133,6 +149,56 @@ class EvaluationPromptBuilder
             - Architectural patterns: {$architecturalPatterns}
 
             EOT;
+
+        return $block;
+    }
+
+    private function collectArtifactBlocks(array $repositoryAnalyses): array
+    {
+        $blocks = [];
+
+        foreach ($repositoryAnalyses as $analysis) {
+            foreach ($analysis->commit_samples ?? [] as $commit) {
+                $blocks[] = "\n        - COMMIT ".(substr($commit['sha'] ?? '', 0, 7)).' | '.($commit['author_date'] ?? '').' | '.($commit['subject'] ?? '');
+            }
+
+            foreach ($analysis->artifact_excerpts ?? [] as $path => $content) {
+                $blocks[] = "\n        ## FILE {$path}\n        {$content}";
+            }
+        }
+
+        return $blocks;
+    }
+
+    private function capArtifacts(array $blocks): string
+    {
+        if (empty($blocks)) {
+            return '';
+        }
+
+        $totalBytes = array_sum(array_map('strlen', $blocks));
+
+        if ($totalBytes > self::MAX_PROMPT_BYTES) {
+            usort($blocks, fn ($a, $b) => strlen($b) <=> strlen($a));
+
+            $kept = [];
+            $budget = self::MAX_PROMPT_BYTES - strlen("\n\n        [TRUNCATED: artifact content exceeds context limits]");
+
+            foreach ($blocks as $block) {
+                if (strlen(implode('', $kept)) + strlen($block) <= $budget) {
+                    $kept[] = $block;
+
+                    continue;
+                }
+
+                break;
+            }
+
+            $blocks = $kept;
+            $blocks[] = "\n\n        [TRUNCATED: artifact content exceeds context limits]";
+        }
+
+        return implode('', $blocks);
     }
 
     private function formatContextValues(array $values): string
