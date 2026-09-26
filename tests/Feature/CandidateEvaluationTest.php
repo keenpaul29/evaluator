@@ -88,6 +88,46 @@ class CandidateEvaluationTest extends TestCase
         $response->assertSee($candidate->name);
     }
 
+    public function test_candidate_show_page_renders_citation_evidence(): void
+    {
+        $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
+        $evaluation = Evaluation::create([
+            'candidate_id' => $candidate->id,
+            'overall_score' => 7.5,
+            'verdict' => 'hire',
+            'narrative_summary' => 'Summary.',
+            'strengths' => [],
+            'concerns' => [],
+            'interview_focus_areas' => [],
+            'ai_model_used' => 'gemini-1.5-flash',
+            'evaluated_at' => now(),
+        ]);
+        EvaluationDimension::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'code_quality',
+            'score' => 8.5,
+            'justification' => 'Strong.',
+            'evidence' => [
+                ['file_path' => 'app/Services/GameService.php', 'commit_sha' => 'abc123def456', 'url' => 'https://github.com/janedoe/rpg-app'],
+            ],
+        ]);
+        EvaluationDimension::create([
+            'evaluation_id' => $evaluation->id,
+            'dimension' => 'communication',
+            'score' => 5.0,
+            'justification' => 'No signal.',
+            'evidence' => [['insufficient' => true]],
+        ]);
+
+        $response = $this->get("/candidates/{$candidate->id}");
+
+        $response->assertStatus(200);
+        $response->assertSee('app/Services/GameService.php');
+        $response->assertSee('abc123d');
+        $response->assertSee('insufficient evidence: no collected signal for this value');
+        $response->assertSee('provisional');
+    }
+
     public function test_candidate_can_be_shortlisted(): void
     {
         $candidate = Candidate::factory()->create(['status' => CandidateStatus::Evaluated]);
@@ -252,15 +292,27 @@ class CandidateEvaluationTest extends TestCase
 
         Http::fake([
             'generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'unavailable']], 503),
-            'api.openai.com/v1/chat/completions' => Http::response([
-                'choices' => [
-                    [
-                        'message' => [
-                            'content' => json_encode($this->aiEvaluationPayload()),
+            'api.openai.com/v1/chat/completions' => function ($request) {
+                $prompt = data_get($request->data(), 'messages.1.content') ?? '';
+
+                if (str_contains($prompt, 'You verify whether cited repository artifacts')) {
+                    return Http::response([
+                        'choices' => [
+                            ['message' => ['content' => json_encode(['supported' => ['app/Services/GameService.php']])]],
+                        ],
+                    ]);
+                }
+
+                return Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => json_encode($this->aiEvaluationPayload()),
+                            ],
                         ],
                     ],
-                ],
-            ]),
+                ]);
+            },
         ]);
 
         $candidate = Candidate::factory()->create([
@@ -749,18 +801,28 @@ class CandidateEvaluationTest extends TestCase
         ], 'gemini-1.5-flash');
     }
 
-    public function test_ai_validation_normalizes_verdict(): void
+    public function test_ai_validation_verdict_score_mismatch_is_stored_verbatim(): void
     {
-        $this->expectException(AiEvaluationException::class);
-
-        $storage = new EvaluationStorage;
         $candidate = Candidate::factory()->create();
 
-        $storage->store($candidate, [
-            'overall_score' => 7.5,
-            'verdict' => 'invalid_verdict',
-            'dimensions' => [],
+        $storage = new EvaluationStorage;
+
+        $evaluation = $storage->store($candidate, [
+            'overall_score' => 5.0,
+            'verdict' => 'strong_hire',
+            'dimensions' => [
+                ['dimension' => 'code_quality', 'score' => 8.0],
+                ['dimension' => 'technical_judgment', 'score' => 8.0],
+                ['dimension' => 'colvalues_alignment', 'score' => 8.0],
+                ['dimension' => 'communication', 'score' => 8.0],
+                ['dimension' => 'problem_complexity', 'score' => 8.0],
+                ['dimension' => 'learning_trajectory', 'score' => 8.0],
+                ['dimension' => 'technical_breadth', 'score' => 8.0],
+            ],
         ], 'gemini-1.5-flash');
+
+        $this->assertSame('strong_hire', $evaluation->verdict);
+        $this->assertSame(5.0, (float) $evaluation->overall_score);
     }
 
     public function test_evaluation_can_be_created_with_all_fields(): void
@@ -902,12 +964,31 @@ class CandidateEvaluationTest extends TestCase
             'dependencies_analysis' => ['php' => 'composer.json detected'],
             'authenticity_score' => 90,
             'authenticity_flags' => ['Organic commit history detected.'],
+            'artifact_file_paths' => [
+                'README.md',
+                'app/Services/GameService.php',
+                'docs/architecture.md',
+            ],
+            'commit_samples' => [
+                ['sha' => sha1('2025-11-01T10:00:00ZAdd game movement system'), 'author_date' => '2025-11-01T10:00:00Z', 'subject' => 'Add game movement system'],
+                ['sha' => sha1('2025-11-02T11:00:00ZFix spawn collision bug'), 'author_date' => '2025-11-02T11:00:00Z', 'subject' => 'Fix spawn collision bug'],
+            ],
+            'artifact_excerpts' => [
+                'README.md' => "# Candidate Repo\n\nInstructions.",
+                'app/Services/GameService.php' => "<?php\n\nclass GameService\n{\n}\n",
+            ],
             'analyzed_at' => now(),
         ];
     }
 
     private function aiEvaluationPayload(): array
     {
+        $citation = [
+            'file_path' => 'app/Services/GameService.php',
+            'commit_sha' => sha1('2025-11-01T10:00:00ZAdd game movement system'),
+            'url' => 'https://github.com/fallback/portfolio',
+        ];
+
         $dimensions = collect([
             'code_quality',
             'technical_judgment',
@@ -920,7 +1001,7 @@ class CandidateEvaluationTest extends TestCase
             'dimension' => $dimension,
             'score' => 7.5,
             'justification' => "Solid {$dimension} evidence.",
-            'evidence' => ['Repository structure and commit history support this score.'],
+            'evidence' => [$citation],
         ])->all();
 
         return [
