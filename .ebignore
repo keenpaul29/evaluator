@@ -1,0 +1,30 @@
+# Local environment — contains a live GITHUB_API_TOKEN and GEMINI_API_KEY.
+# Never ship it. The postdeploy hook writes the real .env on the instance
+# from Elastic Beanstalk environment variables instead.
+.env
+.env.*
+!.env.example
+
+# EB writes the real .env on the instance; uploading the local one would
+# also point the app at the local SQLite database.
+
+# Local SQLite is dev-only. Production runs MySQL.
+database/database.sqlite
+database/database.sqlite-journal
+
+# Build and test artifacts, regenerated or irrelevant on the instance.
+node_modules/.cache
+test-results
+playwright-report
+blob-report
+e2e/fixtures.json
+.phpunit.result.cache
+.phpunit.cache
+
+# Local logs and editor state.
+storage/logs
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+.idea
+.vscode
