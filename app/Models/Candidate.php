@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CandidateStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Candidate extends Model
@@ -22,6 +23,7 @@ class Candidate extends Model
         'submitted_by',
         'submission_type',
         'notes',
+        'batch_id',
     ];
 
     protected $casts = [
@@ -45,6 +47,11 @@ class Candidate extends Model
     public function submitter()
     {
         return $this->belongsTo(HrUser::class, 'submitted_by');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(BatchJob::class, 'batch_id');
     }
 
     public function repositories()

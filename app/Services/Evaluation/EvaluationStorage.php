@@ -55,7 +55,7 @@ class EvaluationStorage
             throw new AiEvaluationException("Invalid AI response: overall_score {$score} out of range 0-10");
         }
 
-        $validVerdicts = ['strong_hire', 'hire', 'maybe', 'no_hire', 'strong_no_hire'];
+        $validVerdicts = ['strong_hire', 'hire', 'maybe', 'no_hire', 'strong_no_hire', 'insufficient_data'];
         if (! isset($parsed['verdict']) || ! in_array($parsed['verdict'], $validVerdicts)) {
             throw new AiEvaluationException('Invalid AI response: invalid verdict');
         }
@@ -87,25 +87,6 @@ class EvaluationStorage
             if ($dimScore < 0 || $dimScore > 10) {
                 throw new AiEvaluationException("Invalid AI response: dimension score {$dimScore} out of range for {$dim['dimension']}");
             }
-        }
-
-        $verdictScoreMap = [
-            'strong_hire' => 8.5,
-            'hire' => 7.0,
-            'maybe' => 5.0,
-            'no_hire' => 3.0,
-            'strong_no_hire' => 0,
-        ];
-
-        $expectedVerdict = null;
-        foreach ($verdictScoreMap as $v => $minScore) {
-            if ($score >= $minScore) {
-                $expectedVerdict = $v;
-            }
-        }
-
-        if ($expectedVerdict && $parsed['verdict'] !== $expectedVerdict) {
-            $parsed['verdict'] = $expectedVerdict;
         }
     }
 }

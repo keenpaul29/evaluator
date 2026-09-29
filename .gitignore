@@ -27,6 +27,13 @@ Thumbs.db
 /database/database.sqlite
 /database/database.sqlite-journal
 
+# Playwright
+/e2e/fixtures.json
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml

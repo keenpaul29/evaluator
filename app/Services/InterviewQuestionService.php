@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\Candidate;
 use App\Models\Evaluation;
 use App\Models\InterviewQuestion;
-use Illuminate\Support\Facades\Http;
+use App\Services\Evaluation\AiProviderClient;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -14,6 +14,10 @@ class InterviewQuestionService
     private const SCORE_THRESHOLD = 6.0;
 
     private const QUESTIONS_PER_DIMENSION = 2;
+
+    public function __construct(
+        private AiProviderClient $client
+    ) {}
 
     public function generate(Candidate $candidate, Evaluation $evaluation): array
     {
@@ -114,71 +118,7 @@ class InterviewQuestionService
 
     private function callAi(string $prompt): string
     {
-        $provider = config('services.ai.provider', 'gemini');
-
-        if ($provider === 'gemini') {
-            return $this->callGemini($prompt);
-        }
-
-        return $this->callOpenAI($prompt);
-    }
-
-    private function callGemini(string $prompt): string
-    {
-        $key = config('services.gemini.api_key', '');
-        $model = config('services.gemini.model', 'gemini-1.5-flash');
-
-        if (! $key) {
-            throw new \RuntimeException('Gemini API key not configured');
-        }
-
-        $response = Http::timeout(120)->post(
-            "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$key}",
-            [
-                'contents' => [['parts' => [['text' => $prompt]]]],
-                'generationConfig' => [
-                    'temperature' => 0.3,
-                    'maxOutputTokens' => 4096,
-                    'responseMimeType' => 'application/json',
-                ],
-            ]
-        );
-
-        if ($response->failed()) {
-            throw new \RuntimeException('Gemini API failed: '.$response->body());
-        }
-
-        return $response->json()['candidates'][0]['content']['parts'][0]['text'] ?? '';
-    }
-
-    private function callOpenAI(string $prompt): string
-    {
-        $key = config('services.openai.api_key', '');
-        $model = config('services.openai.model', 'gpt-4o-mini');
-
-        if (! $key) {
-            throw new \RuntimeException('OpenAI API key not configured');
-        }
-
-        $response = Http::timeout(120)->withHeaders([
-            'Authorization' => 'Bearer '.$key,
-            'Content-Type' => 'application/json',
-        ])->post('https://api.openai.com/v1/chat/completions', [
-            'model' => $model,
-            'messages' => [
-                ['role' => 'system', 'content' => 'You generate interview questions. Output valid JSON only.'],
-                ['role' => 'user', 'content' => $prompt],
-            ],
-            'temperature' => 0.3,
-            'max_tokens' => 4096,
-            'response_format' => ['type' => 'json_object'],
-        ]);
-
-        if ($response->failed()) {
-            throw new \RuntimeException('OpenAI API failed: '.$response->body());
-        }
-
-        return $response->json()['choices'][0]['message']['content'] ?? '';
+        return $this->client->callWithFallback($prompt);
     }
 
     private function parseResponse(string $response): array

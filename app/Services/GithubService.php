@@ -301,7 +301,15 @@ class GithubService
 
     private function parseGithubRepoUrl(string $repoUrl): ?array
     {
-        $path = parse_url(trim($repoUrl), PHP_URL_PATH);
+        $url = trim($repoUrl);
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (! in_array($scheme, ['http', 'https'], true) || ! in_array($host, ['github.com', 'www.github.com'], true)) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
 
         if (! $path) {
             return null;

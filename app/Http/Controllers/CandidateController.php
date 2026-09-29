@@ -7,14 +7,39 @@ use App\Jobs\EvaluateCandidateJob;
 use App\Models\Candidate;
 use App\Models\EvaluationProgress;
 use App\Models\HrUser;
+use App\Services\CsvExporter;
 use App\Services\GithubService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CandidateController extends Controller
 {
     public function index(Request $request)
+    {
+        $candidates = $this->candidateQuery($request)
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('candidates.index', compact('candidates'));
+    }
+
+    public function export(Request $request, CsvExporter $exporter): StreamedResponse
+    {
+        $candidates = $this->candidateQuery($request)
+            ->with('repositories')
+            ->latest()
+            ->get();
+
+        return $exporter->exportCandidates(
+            $candidates,
+            'candidates_'.now()->format('Y-m-d_His').'.csv'
+        );
+    }
+
+    private function candidateQuery(Request $request)
     {
         $query = Candidate::with('evaluation');
 
@@ -49,9 +74,7 @@ class CandidateController extends Controller
             });
         }
 
-        $candidates = $query->latest()->paginate(20)->withQueryString();
-
-        return view('candidates.index', compact('candidates'));
+        return $query;
     }
 
     public function create()
@@ -112,7 +135,7 @@ class CandidateController extends Controller
 
     public function show(Candidate $candidate)
     {
-        $candidate->load(['repositories.analysis', 'evaluation.dimensions', 'evaluation.comments.hrUser']);
+        $candidate->load(['repositories.analysis', 'evaluation.dimensions', 'evaluation.comments.hrUser', 'evaluation.interviewQuestions', 'evaluation.assignment']);
 
         return view('candidates.show', compact('candidate'));
     }

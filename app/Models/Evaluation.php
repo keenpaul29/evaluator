@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Evaluation extends Model
 {
@@ -56,6 +57,11 @@ class Evaluation extends Model
         return $this->hasMany(InterviewQuestion::class);
     }
 
+    public function assignment(): HasOne
+    {
+        return $this->hasOne(Assignment::class);
+    }
+
     public function getDimensionScore(string $dimension): ?float
     {
         $dim = $this->dimensions()->where('dimension', $dimension)->first();
@@ -71,6 +77,7 @@ class Evaluation extends Model
             'maybe' => 'Maybe',
             'no_hire' => 'No Hire',
             'strong_no_hire' => 'Strong No Hire',
+            'insufficient_data' => 'Insufficient Data',
             default => 'Unknown',
         };
     }
@@ -83,6 +90,7 @@ class Evaluation extends Model
             'maybe' => 'amber',
             'no_hire' => 'orange',
             'strong_no_hire' => 'red',
+            'insufficient_data' => 'gray',
             default => 'gray',
         };
     }

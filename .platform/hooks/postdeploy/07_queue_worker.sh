@@ -10,7 +10,7 @@ After=network.target
 User=webapp
 Group=webapp
 WorkingDirectory=/var/app/current
-ExecStart=/usr/bin/php /var/app/current/artisan queue:work --sleep=3 --tries=3 --timeout=300 --max-time=3600
+ExecStart=/usr/bin/php /var/app/current/artisan queue:work --queue=evaluations,default --sleep=3 --tries=3 --timeout=600 --max-time=3600
 Restart=always
 RestartSec=5
 KillSignal=SIGTERM

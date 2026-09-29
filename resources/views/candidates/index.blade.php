@@ -9,10 +9,16 @@
             <h1 class="text-xl font-semibold text-gray-900">Candidates</h1>
             <p class="text-sm text-gray-500 mt-0.5">{{ $candidates->total() }} total</p>
         </div>
-        <a href="{{ route('candidates.create') }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Add Candidate
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('candidates.export', request()->query()) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-button hover:bg-gray-50 transition-all duration-150 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                Export CSV
+            </a>
+            <a href="{{ route('candidates.create') }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Candidate
+            </a>
+        </div>
     </div>
 
     <form method="GET" action="{{ route('candidates.index') }}" class="bg-white rounded-card border border-gray-100 shadow-card p-4">
