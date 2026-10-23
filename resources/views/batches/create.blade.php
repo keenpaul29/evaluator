@@ -4,40 +4,42 @@
 
 @section('content')
 <div class="max-w-xl space-y-4">
-    <div>
-        <a href="{{ route('batches.index') }}" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <a href="{{ route('batches.index') }}"
+           class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 transition-colors focus-visible-ring">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
             Back
         </a>
-        <h1 class="text-xl font-semibold text-gray-900 mt-1">New Batch Evaluation</h1>
+        <h1 class="text-xl font-semibold text-gray-900">New Batch Evaluation</h1>
     </div>
 
-    <form method="POST" action="{{ route('batches.store') }}" enctype="multipart/form-data" class="bg-white rounded-card border border-gray-100 shadow-card p-5 space-y-5">
+    <form method="POST" action="{{ route('batches.store') }}" enctype="multipart/form-data" class="space-y-5">
         @csrf
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Batch Name</label>
-            <input type="text" name="name" value="{{ old('name') }}" required
-                class="w-full px-3 py-2.5 border border-gray-200 rounded-button text-sm focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors"
-                placeholder="e.g., September 2026 Round 1">
-            @error('name') <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p> @enderror
-        </div>
+        <x-card variant="default" class="space-y-5">
+            <x-slot:header>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <h2 class="text-xs font-medium text-gray-900 uppercase tracking-wide">Batch Details</h2>
+                </div>
+            </x-slot:header>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">CSV File</label>
-            <input type="file" name="csv_file" accept=".csv,.txt" required
-                class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-button file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:transition-colors">
-            @error('csv_file') <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p> @enderror
+            <x-form-input type="text" name="name" label="Batch Name" placeholder="e.g., September 2026 Round 1" required :value="old('name')" :error="$errors->first('name')" />
+            
+            <x-form-input type="file" name="csv_file" label="CSV File" accept=".csv,.txt" required :error="$errors->first('csv_file')" />
             <p class="text-xs text-gray-400 mt-1.5">Max 50 candidates. Columns: name, email, github_username, repos</p>
-        </div>
 
-        <div class="bg-gray-50 rounded-card p-4 ring-1 ring-gray-200">
-            <p class="text-xs font-semibold text-gray-700 mb-2">Expected CSV Format:</p>
-            <code class="text-xs text-gray-600 block whitespace-pre font-mono bg-white p-3 rounded-button ring-1 ring-gray-100">name,email,github_username,repos
+            <div class="bg-gray-50 rounded-card p-4 ring-1 ring-gray-200">
+                <p class="text-xs font-semibold text-gray-700 mb-2">Expected CSV Format:</p>
+                <code class="text-xs text-gray-600 block whitespace-pre font-mono bg-white p-3 rounded-button ring-1 ring-gray-100">name,email,github_username,repos
 John Doe,john@example.com,john-dev,"https://github.com/john-dev/repo1,https://github.com/john-dev/repo2"</code>
-        </div>
+            </div>
+        </x-card>
 
-        <button type="submit" class="w-full px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm">
+        <button type="submit" class="w-full px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm focus-visible-ring">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             Start Batch Evaluation
         </button>
     </form>

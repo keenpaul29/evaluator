@@ -42,6 +42,10 @@ class Candidate extends Model
         static::created(function (Candidate $candidate) {
             cache()->forget('dashboard_stats');
         });
+
+        static::deleted(function (Candidate $candidate) {
+            cache()->forget('dashboard_stats');
+        });
     }
 
     public function submitter()
@@ -69,9 +73,18 @@ class Candidate extends Model
         return $this->hasMany(EvaluationProgress::class);
     }
 
+    public function latestProgress(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(EvaluationProgress::class)->latestOfMany();
+    }
+
     public function getLatestProgressAttribute(): ?EvaluationProgress
     {
-        return $this->progress()->latest()->first();
+        if ($this->relationLoaded('latestProgress')) {
+            return $this->latestProgress;
+        }
+
+        return $this->latestProgressCached ??= $this->progress()->latest()->first();
     }
 
     public function scopeSubmitted($query)

@@ -29,14 +29,17 @@ class EvaluationStorage
         ]);
 
         $dimensions = $parsed['dimensions'] ?? [];
-        foreach ($dimensions as $dim) {
-            EvaluationDimension::create([
-                'evaluation_id' => $evaluation->id,
-                'dimension' => $dim['dimension'],
-                'score' => $dim['score'],
-                'justification' => $dim['justification'] ?? '',
-                'evidence' => $dim['evidence'] ?? [],
-            ]);
+        if (! empty($dimensions)) {
+            $dimensionData = array_map(function ($dim) {
+                return [
+                    'dimension' => $dim['dimension'],
+                    'score' => $dim['score'],
+                    'justification' => $dim['justification'] ?? '',
+                    'evidence' => $dim['evidence'] ?? [],
+                ];
+            }, $dimensions);
+
+            $evaluation->dimensions()->createMany($dimensionData);
         }
 
         $candidate->update(['status' => CandidateStatus::Evaluated]);

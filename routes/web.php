@@ -45,3 +45,6 @@ Route::post('/batches', [BatchController::class, 'store'])->name('batches.store'
 Route::get('/batches/{batch}/export', [BatchController::class, 'export'])->name('batches.export');
 Route::post('/batches/{batch}/add-candidates', [BatchController::class, 'addCandidates'])->name('batches.add-candidates');
 Route::get('/batches/{batch}', [BatchController::class, 'show'])->name('batches.show');
+
+Route::get('/components', [ComponentController::class, 'index'])->name('components.index');
+Route::get('/design-tokens', [DesignTokenController::class, 'index'])->name('design-tokens.index');

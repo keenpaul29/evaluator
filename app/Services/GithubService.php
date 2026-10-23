@@ -16,6 +16,8 @@ class GithubService
 
     private ?int $rateLimitReset = null;
 
+    private array $fileContentCache = [];
+
     public function __construct()
     {
         $this->token = config('services.github.token') ?? '';
@@ -179,9 +181,25 @@ class GithubService
 
     public function getFileContent(string $owner, string $repo, string $path): ?string
     {
+        $cacheKey = "{$owner}/{$repo}/{$path}";
+        if (array_key_exists($cacheKey, $this->fileContentCache)) {
+            return $this->fileContentCache[$cacheKey];
+        }
+
         $contents = $this->getRepoContents($owner, $repo, $path);
 
-        if (! $contents || ! isset($contents['download_url'])) {
+        if (! $contents) {
+            return null;
+        }
+
+        if (isset($contents['content']) && $contents['encoding'] === 'base64') {
+            $decoded = base64_decode($contents['content']);
+            $this->fileContentCache[$cacheKey] = $decoded;
+
+            return $decoded;
+        }
+
+        if (! isset($contents['download_url'])) {
             return null;
         }
 
@@ -192,7 +210,10 @@ class GithubService
             return null;
         }
 
-        return $response->body();
+        $body = $response->body();
+        $this->fileContentCache[$cacheKey] = $body;
+
+        return $body;
     }
 
     public function getRepoTree(string $owner, string $repo, string $sha = 'HEAD'): array

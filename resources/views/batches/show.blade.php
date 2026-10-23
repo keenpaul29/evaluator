@@ -4,14 +4,15 @@
 
 @section('content')
 <div class="space-y-4">
-    <div>
-        <a href="{{ route('batches.index') }}" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <a href="{{ route('batches.index') }}"
+           class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 transition-colors focus-visible-ring">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
             Back
         </a>
-        <div class="flex items-start justify-between gap-4">
-            <div>
-                <h1 class="text-xl font-semibold text-gray-900 mt-1">{{ $batch->name }}</h1>
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 w-full">
+            <div class="flex-1 min-w-0">
+                <h1 class="text-xl font-semibold text-gray-900">{{ $batch->name }}</h1>
                 <p class="text-sm text-gray-500 mt-0.5">
                     @php
                         $statusColors = [
@@ -20,23 +21,30 @@
                             'complete' => 'text-green-600',
                             'partial_failure' => 'text-amber-600',
                         ];
+                        $statusBgColors = [
+                            'pending' => 'bg-gray-50 text-gray-600 ring-gray-500/20',
+                            'processing' => 'bg-blue-50 text-blue-600 ring-blue-600/20',
+                            'complete' => 'bg-green-50 text-green-600 ring-green-600/20',
+                            'partial_failure' => 'bg-amber-50 text-amber-600 ring-amber-600/20',
+                        ];
                     @endphp
-                    <span class="{{ $statusColors[$batch->status] ?? '' }}">{{ ucfirst(str_replace('_', ' ', $batch->status)) }}</span>
+                    <x-badge label="{{ ucfirst(str_replace('_', ' ', $batch->status)) }}" variant="status-{{ $batch->status }}" size="sm" />
                     · {{ $batch->processed_count }}/{{ $batch->total_candidates }} processed
                     @if($batch->failed_count > 0)
-                        · <span class="text-red-500">{{ $batch->failed_count }} failed</span>
+                        · <x-badge label="{{ $batch->failed_count }} failed" variant="danger" size="sm" dot="false" />
                     @endif
                 </p>
             </div>
-            <a href="{{ route('batches.export', $batch) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+            <a href="{{ route('batches.export', $batch) }}"
+               class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm focus-visible-ring">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
                 Export CSV
             </a>
         </div>
     </div>
 
     @if($batch->status === 'processing')
-        <div class="bg-blue-50 rounded-card border border-blue-100 p-5" x-data="pollBatch()" x-init="startPolling()">
+        <x-card variant="default" padding="md" class="bg-blue-50 border-blue-100" x-data="pollBatch()" x-init="startPolling()">
             <div class="flex items-center gap-3">
                 <div class="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                 <p class="text-blue-700 text-sm font-medium">Processing...</p>
@@ -50,7 +58,7 @@
                 <div class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width: {{ $progressPercent }}%"></div>
             </div>
             <p class="text-xs text-blue-500 mt-2">Page refreshes automatically.</p>
-        </div>
+        </x-card>
         @push('scripts')
         <script>
         function pollBatch() {
@@ -80,10 +88,61 @@
         @endpush
     @endif
 
+    @php
+        $candidateRows = $batch->candidates->map(function($candidate) {
+            $sColors = [
+                'submitted' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                'analyzing' => 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                'evaluated' => 'bg-purple-50 text-purple-700 ring-purple-600/20',
+            ];
+            $verdictLabels = [
+                'strong_hire' => 'Strong Hire',
+                'hire' => 'Hire',
+                'maybe' => 'Maybe',
+                'no_hire' => 'No Hire',
+                'strong_no_hire' => 'Strong No Hire',
+            ];
+            $verdictColors = [
+                'strong_hire' => 'text-green-600',
+                'hire' => 'text-emerald-600',
+                'maybe' => 'text-amber-600',
+                'no_hire' => 'text-orange-600',
+                'strong_no_hire' => 'text-red-600',
+            ];
+            $nameHtml = '<a href="' . route('candidates.show', $candidate) . '" class="font-medium text-gray-900 hover:text-accent transition-colors">' . $candidate->name . '</a>' .
+                '<div class="text-xs text-gray-400">' . $candidate->github_username . '</div>';
+            $sColors = [
+                'submitted' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                'analyzing' => 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                'evaluated' => 'bg-purple-50 text-purple-700 ring-purple-600/20',
+            ];
+            $statusHtml = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-badge text-xs font-medium ring-1 ring-inset ' . ($sColors[$candidate->status->value] ?? 'bg-gray-50 text-gray-600 ring-gray-500/20') . '"><span class="w-1 h-1 rounded-full bg-current"></span>' . $candidate->status->label() . '</span>';
+            $scoreHtml = '<span class="font-mono text-sm text-gray-700">' . ($candidate->evaluation?->overall_score ?? '—') . '</span>';
+            $verdictLabels = [
+                'strong_hire' => 'Strong Hire',
+                'hire' => 'Hire',
+                'maybe' => 'Maybe',
+                'no_hire' => 'No Hire',
+                'strong_no_hire' => 'Strong No Hire',
+            ];
+            $verdictColors = [
+                'strong_hire' => 'text-green-600',
+                'hire' => 'text-emerald-600',
+                'maybe' => 'text-amber-600',
+                'no_hire' => 'text-orange-600',
+                'strong_no_hire' => 'text-red-600',
+            ];
+            $verdictHtml = $candidate->evaluation ? '<span class="text-xs font-medium ' . ($verdictColors[$candidate->evaluation->verdict] ?? '') . '">' . ($verdictLabels[$candidate->evaluation->verdict] ?? '') . '</span>' : '<span class="text-gray-300">—</span>';
+            return [
+                'name' => $nameHtml,
+                'status' => $statusHtml,
+                'score' => $scoreHtml,
+                'verdict' => $verdictHtml,
+            ];
+        });
+    @endphp
+
     <div class="bg-white rounded-card border border-gray-100 shadow-card overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-100">
-            <h2 class="text-sm font-semibold text-gray-900">Candidates ({{ $batch->candidates->count() }})</h2>
-        </div>
         @if($batch->candidates->isEmpty())
             <div class="p-12 text-center">
                 <p class="text-gray-400 text-sm">No candidates in this batch.</p>
@@ -100,34 +159,12 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
-                        @foreach($batch->candidates as $candidate)
+                        @foreach($candidateRows as $row)
                             <tr class="hover:bg-gray-50/50 transition-colors">
-                                <td class="px-5 py-3.5">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                                            {{ strtoupper(substr($candidate->name, 0, 2)) }}
-                                        </div>
-                                        <div>
-                                            <a href="{{ route('candidates.show', $candidate) }}" class="font-medium text-gray-900 hover:text-accent transition-colors">{{ $candidate->name }}</a>
-                                            <div class="text-xs text-gray-400">{{ $candidate->github_username }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-5 py-3.5">
-                                    @php
-                                        $sColors = [
-                                            'submitted' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
-                                            'analyzing' => 'bg-blue-50 text-blue-700 ring-blue-600/20',
-                                            'evaluated' => 'bg-purple-50 text-purple-700 ring-purple-600/20',
-                                        ];
-                                    @endphp
-                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-badge text-xs font-medium ring-1 ring-inset {{ $sColors[$candidate->status->value] ?? 'bg-gray-50 text-gray-600 ring-gray-500/20' }}">
-                                        <span class="w-1 h-1 rounded-full bg-current"></span>
-                                        {{ $candidate->status->label() }}
-                                    </span>
-                                </td>
-                                <td class="px-5 py-3.5 text-right font-mono text-sm text-gray-700">{{ $candidate->evaluation?->overall_score ?? '—' }}</td>
-                                <td class="px-5 py-3.5 text-sm text-gray-600">{{ $candidate->evaluation?->verdict ?? '—' }}</td>
+                                <td class="px-5 py-3.5">{!! $row['name'] !!}</td>
+                                <td class="px-5 py-3.5">{!! $row['status'] !!}</td>
+                                <td class="px-5 py-3.5 text-right">{!! $row['score'] !!}</td>
+                                <td class="px-5 py-3.5">{!! $row['verdict'] !!}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -135,18 +172,22 @@
             </div>
         @endif
     </div>
-<div class="bg-white rounded-card border border-gray-100 shadow-card overflow-hidden" x-data="{ query: '', selected: [] }">
-        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
-            <div>
-                <h2 class="text-sm font-semibold text-gray-900">Add Existing Candidates</h2>
-                <p class="text-xs text-gray-400 mt-0.5">Attach candidates not yet in this batch. Unevaluated ones are queued automatically.</p>
+
+    <x-card variant="default" x-data="{ query: '', selected: [] }">
+        <x-slot:header>
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xs font-semibold text-gray-900 uppercase tracking-wide">Add Existing Candidates</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">Attach candidates not yet in this batch. Unevaluated ones are queued automatically.</p>
+                </div>
+                <span class="text-xs text-gray-400">showing up to 100</span>
             </div>
-            <span class="text-xs text-gray-400">showing up to 100</span>
-        </div>
+        </x-slot:header>
+
         <div class="px-5 py-3 border-b border-gray-100">
-            <input type="text" x-model="query" placeholder="Search by name, email, or GitHub..."
-                class="w-full px-3 py-2 border border-gray-200 rounded-button text-sm focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors">
+            <x-form-input type="text" name="query" label="Search" placeholder="Search by name, email, or GitHub..." :value="null" :error="null" />
         </div>
+
         <form method="POST" action="{{ route('batches.add-candidates', $batch) }}" class="divide-y divide-gray-50 max-h-64 overflow-y-auto">
             @csrf
             @foreach($availableCandidates as $candidate)
@@ -172,12 +213,12 @@
                 <div class="text-sm text-gray-400">
                     You selected <span class="font-mono font-semibold text-gray-700" x-text="selected.length">0</span> candidate(s)
                 </div>
-                <button type="submit" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <button type="submit" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 text-white text-sm font-medium rounded-button hover:bg-gray-800 transition-all duration-150 shadow-sm focus-visible-ring">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Add to Batch
                 </button>
             </div>
         </form>
-    </div>
+    </x-card>
 </div>
 @endsection

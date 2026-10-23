@@ -64,9 +64,13 @@ class Evaluation extends Model
 
     public function getDimensionScore(string $dimension): ?float
     {
-        $dim = $this->dimensions()->where('dimension', $dimension)->first();
+        if ($this->relationLoaded('dimensions')) {
+            $dim = $this->dimensions->firstWhere('dimension', $dimension);
+        } else {
+            $dim = $this->dimensions()->where('dimension', $dimension)->first();
+        }
 
-        return $dim?->score;
+        return $dim?->score !== null ? (float) $dim->score : null;
     }
 
     public function getVerdictLabel(): string

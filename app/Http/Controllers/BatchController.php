@@ -47,12 +47,14 @@ class BatchController extends Controller
             return back()->with('error', 'Maximum batch size is 50 candidates.');
         }
 
+        $submitterId = Auth::id() ?? HrUser::first()?->id;
+
         $batch = BatchJob::create([
             'name' => $request->name,
             'csv_filename' => $file->getClientOriginalName(),
             'total_candidates' => count($rows),
             'status' => 'pending',
-            'hr_user_id' => Auth::id() ?? HrUser::first()?->id,
+            'hr_user_id' => $submitterId,
         ]);
 
         $githubService = app(GithubService::class);
@@ -73,7 +75,7 @@ class BatchController extends Controller
                 'github_username' => $githubUsername,
                 'status' => CandidateStatus::Submitted,
                 'submission_type' => 'hr_initiated',
-                'submitted_by' => Auth::id() ?? HrUser::first()?->id,
+                'submitted_by' => $submitterId,
                 'batch_id' => $batch->id,
             ]);
 

@@ -92,6 +92,13 @@ class EvaluationOrchestrator
 
     private function analyzeRepos(Candidate $candidate, $repositories, EvaluationProgress $progress): array
     {
+        // Cap to top 5 repositories sorted by stars and recency to prevent API exhaustion
+        if ($repositories->count() > 5) {
+            $repositories = $repositories->sortByDesc('stars_count')
+                ->sortByDesc('updated_at_github')
+                ->take(5);
+        }
+
         $totalRepos = $repositories->count();
         $progress->steps_total = $totalRepos + 2;
         $progress->save();

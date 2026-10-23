@@ -182,11 +182,14 @@ class EvaluationPromptBuilder
             usort($blocks, fn ($a, $b) => strlen($b) <=> strlen($a));
 
             $kept = [];
+            $keptBytes = 0;
             $budget = self::MAX_PROMPT_BYTES - strlen("\n\n        [TRUNCATED: artifact content exceeds context limits]");
 
             foreach ($blocks as $block) {
-                if (strlen(implode('', $kept)) + strlen($block) <= $budget) {
+                $blockLen = strlen($block);
+                if ($keptBytes + $blockLen <= $budget) {
                     $kept[] = $block;
+                    $keptBytes += $blockLen;
 
                     continue;
                 }

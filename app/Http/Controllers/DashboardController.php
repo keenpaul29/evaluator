@@ -12,13 +12,18 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $stats = Cache::remember('dashboard_stats', 60, function () {
+            $statusCounts = Candidate::selectRaw('status, count(*) as count')
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+
             $stats = [
-                'total' => Candidate::count(),
-                'submitted' => Candidate::submitted()->count(),
-                'analyzing' => Candidate::analyzed()->count(),
-                'evaluated' => Candidate::evaluated()->count(),
-                'shortlisted' => Candidate::shortlisted()->count(),
-                'rejected' => Candidate::rejected()->count(),
+                'total' => array_sum($statusCounts),
+                'submitted' => $statusCounts['submitted'] ?? 0,
+                'analyzing' => $statusCounts['analyzing'] ?? 0,
+                'evaluated' => $statusCounts['evaluated'] ?? 0,
+                'shortlisted' => $statusCounts['shortlisted'] ?? 0,
+                'rejected' => $statusCounts['rejected'] ?? 0,
             ];
 
             $stats['avg_score'] = Evaluation::avg('overall_score');

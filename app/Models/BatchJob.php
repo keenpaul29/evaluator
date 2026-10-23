@@ -38,12 +38,14 @@ class BatchJob extends Model
     public function incrementProcessed(): void
     {
         $this->increment('processed_count');
+        $this->refresh();
         $this->checkCompletion();
     }
 
     public function incrementFailed(): void
     {
         $this->increment('failed_count');
+        $this->refresh();
         $this->checkCompletion();
     }
 

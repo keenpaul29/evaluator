@@ -29,7 +29,7 @@ class CandidateController extends Controller
     public function export(Request $request, CsvExporter $exporter): StreamedResponse
     {
         $candidates = $this->candidateQuery($request)
-            ->with('repositories')
+            ->with(['repositories', 'evaluation'])
             ->latest()
             ->get();
 

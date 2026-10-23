@@ -96,14 +96,14 @@ class RepositoryAnalyzer
         [$owner, $repoName] = explode('/', $repository->full_name, 2);
 
         foreach ($sampledFiles as $file) {
-            $content = $this->github->getFileContent(
-                $owner,
-                $repoName,
-                $file['path']
-            );
+            if (isset($file['size']) && is_numeric($file['size'])) {
+                $totalLines += (int) ($file['size'] / 35);
+            } else {
+                $content = $this->github->getFileContent($owner, $repoName, $file['path']);
 
-            if ($content) {
-                $totalLines += substr_count($content, "\n") + 1;
+                if ($content) {
+                    $totalLines += substr_count($content, "\n") + 1;
+                }
             }
         }
 
@@ -214,36 +214,37 @@ class RepositoryAnalyzer
     {
         $patterns = [];
         $paths = $files->pluck('path')->toArray();
+        $pathCollection = collect($paths);
 
-        if (collect($paths)->contains(fn ($p) => str($p)->startsWith('app/Http/Controllers/'))) {
+        if ($pathCollection->contains(fn ($p) => str_starts_with($p, 'app/Http/Controllers/'))) {
             $patterns[] = 'MVC';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->contains('Service'))) {
+        if ($pathCollection->contains(fn ($p) => str_contains($p, 'Service'))) {
             $patterns[] = 'Service Layer';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->contains('Repository'))) {
+        if ($pathCollection->contains(fn ($p) => str_contains($p, 'Repository'))) {
             $patterns[] = 'Repository Pattern';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->contains('Middleware'))) {
+        if ($pathCollection->contains(fn ($p) => str_contains($p, 'Middleware'))) {
             $patterns[] = 'Middleware';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->startsWith('resources/js/components/'))) {
+        if ($pathCollection->contains(fn ($p) => str_starts_with($p, 'resources/js/components/'))) {
             $patterns[] = 'Component-based UI';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->startsWith('database/migrations/'))) {
+        if ($pathCollection->contains(fn ($p) => str_starts_with($p, 'database/migrations/'))) {
             $patterns[] = 'Migration-based schema';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->contains('docker') || str($p)->contains('Docker'))) {
+        if ($pathCollection->contains(fn ($p) => str_contains(strtolower($p), 'docker'))) {
             $patterns[] = 'Containerized';
         }
 
-        if (collect($paths)->contains(fn ($p) => str($p)->contains('.github/workflows'))) {
+        if ($pathCollection->contains(fn ($p) => str_contains($p, '.github/workflows'))) {
             $patterns[] = 'CI/CD';
         }
 

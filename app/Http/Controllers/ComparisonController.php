@@ -14,7 +14,7 @@ class ComparisonController extends Controller
     {
         $comparisons = CandidateComparison::with('candidates.evaluation')
             ->latest()
-            ->get();
+            ->paginate(20);
 
         return view('comparisons.index', compact('comparisons'));
     }

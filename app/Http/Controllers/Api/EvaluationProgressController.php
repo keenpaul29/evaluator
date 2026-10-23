@@ -47,6 +47,10 @@ class EvaluationProgressController extends Controller
             $iteration = 0;
 
             while ($iteration < $maxIterations) {
+                if (connection_aborted()) {
+                    break;
+                }
+
                 $candidate->refresh();
                 $progress = $candidate->latestProgress;
 

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
+
 class ColoredCowContext
 {
     public static function getValues(): array
@@ -237,14 +239,16 @@ EOT;
 
     public static function getFullContext(): array
     {
-        return [
-            'company' => static::getCompanyProfile(),
-            'values' => static::getValues(),
-            'tech_stack' => static::getTechStack(),
-            'hiring_philosophy' => static::getHiringPhilosophy(),
-            'take_home_contract' => static::getTakeHomeContract(),
-            'portfolio' => static::getPortfolio(),
-            'work_methods' => static::getWorkMethods(),
-        ];
+        return Cache::rememberForever('coloredcow_full_context', function () {
+            return [
+                'company' => static::getCompanyProfile(),
+                'values' => static::getValues(),
+                'tech_stack' => static::getTechStack(),
+                'hiring_philosophy' => static::getHiringPhilosophy(),
+                'take_home_contract' => static::getTakeHomeContract(),
+                'portfolio' => static::getPortfolio(),
+                'work_methods' => static::getWorkMethods(),
+            ];
+        });
     }
 }
